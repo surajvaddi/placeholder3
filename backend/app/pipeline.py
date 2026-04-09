@@ -1,12 +1,20 @@
 import hashlib
 import json
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .connectors import build_connector_registry
+from .connectors.base import ConnectorContext
 from .dedupe import DedupeEngine
 from .models import OrgRecord, ParentEntity, RunMode
 from .models_seeds import ExpansionSeed, ParentSeed, SeedFamily, SeedRegistryEntry
+from .models_sources import OrgRecordCandidate, ParentEntityCandidate
+from .services.fetcher import Fetcher
+from .services.normalizer import canonical_instagram, normalize_city, normalize_name, normalize_state
+from .services.policy import default_policy_registry
+from .services.provenance import format_notes_from_evidence
 from .services.seeds import SeedService
 from .storage import Storage
 
@@ -45,6 +53,8 @@ class TwoShotPipeline:
             parent_seed_file=parent_seed_file, expansion_seed_file=expansion_seed_file
         )
         self.dedupe = DedupeEngine()
+        self.connectors = build_connector_registry()
+        self.policy_registry = default_policy_registry()
 
     def run(self, run_id: int, mode: RunMode, seed_ids: list[str] | None = None) -> dict:
         requested_seed_ids = {seed_id.lower() for seed_id in (seed_ids or [])}
@@ -129,7 +139,7 @@ class TwoShotPipeline:
         started_at = _utc_now()
         entities: list[ParentEntity] = []
         for unit in units:
-            entity = self._build_parent_entity(unit.seed)
+            entity = asyncio.run(self._run_shot_one_connector(run_id, unit))
             entities.append(entity)
             self.storage.record_processing_history(
                 run_id=run_id,
@@ -214,7 +224,7 @@ class TwoShotPipeline:
         started_at = _utc_now()
         discovered: list[OrgRecord] = []
         for unit in units:
-            records = self._mock_expand_unit(unit)
+            records = asyncio.run(self._run_shot_two_connector(run_id, unit))
             discovered.extend(records)
             self.storage.record_processing_history(
                 run_id=run_id,
@@ -245,52 +255,6 @@ class TwoShotPipeline:
             source_seed_id=seed.seed_id,
             notes=f"seeded parent entity; seed_id={seed.seed_id}; seed_type={seed.seed_type}",
         )
-
-    def _mock_expand_unit(self, unit: ShotTwoUnit) -> list[OrgRecord]:
-        records: list[OrgRecord] = []
-        demo_schools = [("Austin", "TX"), ("Los Angeles", "CA"), ("Madison", "WI")]
-        slug = unit.parent_entity.name.lower().replace(" ", "")
-        for city, state in demo_schools:
-            club_name = f"{unit.parent_entity.name} - {city} Chapter"
-            records.append(
-                OrgRecord(
-                    parent_key=unit.parent_entity.parent_key,
-                    expansion_seed_id=unit.expansion_seed.seed_id,
-                    email=f"contact@{slug}.{state.lower()}.edu",
-                    name=club_name,
-                    business_name=club_name,
-                    category=unit.parent_entity.category,
-                    location=f"{city}, {state}",
-                    city=city,
-                    state=state,
-                    followers="",
-                    website="",
-                    instagram=f"https://instagram.com/{slug}_{city.lower().replace(' ', '')}",
-                    notes=(
-                        "demo generated record; "
-                        f"expansion_seed_id={unit.expansion_seed.seed_id}; "
-                        f"connector={unit.expansion_seed.connector}"
-                    ),
-                )
-            )
-            records.append(
-                OrgRecord(
-                    parent_key=unit.parent_entity.parent_key,
-                    expansion_seed_id=unit.expansion_seed.seed_id,
-                    email="",
-                    name=club_name,
-                    business_name=f"{unit.parent_entity.name} {city} Chapter",
-                    category=unit.parent_entity.category,
-                    location=f"{city}, {state}",
-                    city=city,
-                    state=state,
-                    followers="",
-                    website="",
-                    instagram=f"@{slug}_{city.lower().replace(' ', '')}",
-                    notes="possible duplicate variant",
-                )
-            )
-        return records
 
     def _build_parent_key(self, seed: ParentSeed) -> str:
         digest = _stable_hash(
@@ -357,3 +321,61 @@ class TwoShotPipeline:
                 fingerprint=entry.fingerprint,
                 processed_at=processed_at,
             )
+
+    async def _run_shot_one_connector(self, run_id: int, unit: ShotOneUnit) -> ParentEntity:
+        connector = self.connectors["mock_parent_directory"]
+        async with Fetcher(
+            policy_registry=self.policy_registry, connector_name=connector.connector_name
+        ) as fetcher:
+            candidates = await connector.discover_parent_entities(
+                seed=unit.seed,
+                fetcher=fetcher,
+                context=ConnectorContext(run_id=run_id),
+            )
+        if not candidates:
+            return self._build_parent_entity(unit.seed)
+        return self._candidate_to_parent_entity(unit.seed, candidates[0])
+
+    async def _run_shot_two_connector(self, run_id: int, unit: ShotTwoUnit) -> list[OrgRecord]:
+        connector = self.connectors[unit.expansion_seed.connector]
+        async with Fetcher(
+            policy_registry=self.policy_registry, connector_name=connector.connector_name
+        ) as fetcher:
+            candidates = await connector.discover_org_records(
+                parent=unit.parent_entity,
+                expansion_seed=unit.expansion_seed,
+                fetcher=fetcher,
+                context=ConnectorContext(run_id=run_id),
+            )
+        return [self._candidate_to_org_record(candidate) for candidate in candidates]
+
+    def _candidate_to_parent_entity(
+        self, seed: ParentSeed, candidate: ParentEntityCandidate
+    ) -> ParentEntity:
+        parent_key = candidate.parent_key or self._build_parent_key(seed)
+        return ParentEntity(
+            parent_key=parent_key,
+            name=normalize_name(candidate.name),
+            category=candidate.category,
+            seed_type=candidate.seed_type or seed.seed_type,
+            source_seed_id=candidate.source_seed_id or seed.seed_id,
+            source_url=candidate.source_url or None,
+            notes=format_notes_from_evidence(candidate.evidence, [candidate.notes]),
+        )
+
+    def _candidate_to_org_record(self, candidate: OrgRecordCandidate) -> OrgRecord:
+        return OrgRecord(
+            parent_key=candidate.parent_key,
+            expansion_seed_id=candidate.expansion_seed_id,
+            email=candidate.email,
+            name=normalize_name(candidate.name),
+            business_name=normalize_name(candidate.business_name),
+            category=candidate.category,
+            location=candidate.location,
+            city=normalize_city(candidate.city),
+            state=normalize_state(candidate.state),
+            followers=candidate.followers,
+            website=candidate.website,
+            instagram=canonical_instagram(candidate.instagram),
+            notes=format_notes_from_evidence(candidate.evidence, [candidate.notes]),
+        )
