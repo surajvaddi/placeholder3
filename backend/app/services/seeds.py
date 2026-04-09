@@ -110,6 +110,12 @@ class SeedService:
 
         return entries
 
+    def fingerprint_parent_seed(self, seed: ParentSeed) -> str:
+        return _parent_seed_fingerprint(seed)
+
+    def fingerprint_expansion_seed(self, seed: ExpansionSeed) -> str:
+        return _expansion_seed_fingerprint(seed)
+
     def changed_parent_seeds(
         self,
         bundle: SeedBundle,

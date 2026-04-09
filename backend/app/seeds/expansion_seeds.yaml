@@ -127,9 +127,6 @@ expansion_seeds:
         - parent_sigma_chi
         - parent_kappa_alpha_theta
         - parent_phi_mu
-      tags:
-        - cultural
-        - greek_life
     enabled: true
     priority: 5
     discovery_mode: enrich_existing_only

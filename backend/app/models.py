@@ -18,13 +18,18 @@ class RunMode(str, Enum):
 
 
 class ParentEntity(BaseModel):
+    parent_key: str = ""
     name: str
     category: str
+    seed_type: str = ""
+    source_seed_id: str = ""
     notes: str = ""
     source_url: Optional[str] = None
 
 
 class OrgRecord(BaseModel):
+    parent_key: str = ""
+    expansion_seed_id: str = ""
     email: str = ""
     name: str
     business_name: str

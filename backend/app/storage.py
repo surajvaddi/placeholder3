@@ -1,4 +1,5 @@
 import csv
+import json
 import sqlite3
 from pathlib import Path
 from typing import Iterable, List
@@ -37,19 +38,29 @@ class Storage:
                 CREATE TABLE IF NOT EXISTS parent_entities (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_id INTEGER NOT NULL,
+                    parent_key TEXT NOT NULL DEFAULT '',
                     name TEXT NOT NULL,
                     category TEXT NOT NULL,
+                    seed_type TEXT NOT NULL DEFAULT '',
+                    source_seed_id TEXT NOT NULL DEFAULT '',
                     notes TEXT NOT NULL DEFAULT '',
                     source_url TEXT NOT NULL DEFAULT '',
                     FOREIGN KEY (run_id) REFERENCES runs(run_id)
                 )
                 """
             )
+            self._ensure_column(conn, "parent_entities", "parent_key", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "parent_entities", "seed_type", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(
+                conn, "parent_entities", "source_seed_id", "TEXT NOT NULL DEFAULT ''"
+            )
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS org_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_id INTEGER NOT NULL,
+                    parent_key TEXT NOT NULL DEFAULT '',
+                    expansion_seed_id TEXT NOT NULL DEFAULT '',
                     email TEXT NOT NULL DEFAULT '',
                     name TEXT NOT NULL,
                     business_name TEXT NOT NULL,
@@ -66,6 +77,10 @@ class Storage:
                 )
                 """
             )
+            self._ensure_column(conn, "org_records", "parent_key", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(
+                conn, "org_records", "expansion_seed_id", "TEXT NOT NULL DEFAULT ''"
+            )
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS seed_registry (
@@ -81,6 +96,31 @@ class Storage:
                     status TEXT NOT NULL,
                     PRIMARY KEY (seed_id, seed_family)
                 )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS processing_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id INTEGER NOT NULL,
+                    shot TEXT NOT NULL,
+                    unit_key TEXT NOT NULL,
+                    seed_id TEXT NOT NULL DEFAULT '',
+                    expansion_seed_id TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL,
+                    input_fingerprint TEXT NOT NULL,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    error_message TEXT NOT NULL DEFAULT '',
+                    context_json TEXT NOT NULL DEFAULT '',
+                    FOREIGN KEY (run_id) REFERENCES runs(run_id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_processing_history_lookup
+                ON processing_history (shot, unit_key, status)
                 """
             )
 
@@ -244,11 +284,22 @@ class Storage:
         with self._connect() as conn:
             conn.executemany(
                 """
-                INSERT INTO parent_entities (run_id, name, category, notes, source_url)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO parent_entities (
+                    run_id, parent_key, name, category, seed_type, source_seed_id, notes, source_url
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
-                    (run_id, e.name, e.category, e.notes, e.source_url or "")
+                    (
+                        run_id,
+                        e.parent_key,
+                        e.name,
+                        e.category,
+                        e.seed_type,
+                        e.source_seed_id,
+                        e.notes,
+                        e.source_url or "",
+                    )
                     for e in entities
                 ],
             )
@@ -259,14 +310,16 @@ class Storage:
             conn.executemany(
                 """
                 INSERT INTO org_records (
-                    run_id, email, name, business_name, category, location, city, state,
+                    run_id, parent_key, expansion_seed_id, email, name, business_name, category, location, city, state,
                     followers, website, instagram, notes, status
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
                         run_id,
+                        r.parent_key,
+                        r.expansion_seed_id,
                         r.email,
                         r.name,
                         r.business_name,
@@ -323,7 +376,7 @@ class Storage:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT email, name, business_name, category, location, city, state,
+                SELECT parent_key, expansion_seed_id, email, name, business_name, category, location, city, state,
                        followers, website, instagram, notes, status
                 FROM org_records
                 WHERE run_id = ?
@@ -332,18 +385,76 @@ class Storage:
             ).fetchall()
         return [
             OrgRecord(
-                email=r[0],
-                name=r[1],
-                business_name=r[2],
-                category=r[3],
-                location=r[4],
-                city=r[5],
-                state=r[6],
-                followers=r[7],
-                website=r[8],
-                instagram=r[9],
-                notes=r[10],
-                status=RecordStatus(r[11]),
+                parent_key=r[0],
+                expansion_seed_id=r[1],
+                email=r[2],
+                name=r[3],
+                business_name=r[4],
+                category=r[5],
+                location=r[6],
+                city=r[7],
+                state=r[8],
+                followers=r[9],
+                website=r[10],
+                instagram=r[11],
+                notes=r[12],
+                status=RecordStatus(r[13]),
             )
             for r in rows
         ]
+
+    def record_processing_history(
+        self,
+        run_id: int,
+        shot: str,
+        unit_key: str,
+        seed_id: str,
+        expansion_seed_id: str,
+        status: str,
+        input_fingerprint: str,
+        started_at: str,
+        completed_at: str | None,
+        error_message: str = "",
+        context: dict | None = None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO processing_history (
+                    run_id, shot, unit_key, seed_id, expansion_seed_id, status,
+                    input_fingerprint, started_at, completed_at, error_message, context_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    shot,
+                    unit_key,
+                    seed_id,
+                    expansion_seed_id,
+                    status,
+                    input_fingerprint,
+                    started_at,
+                    completed_at,
+                    error_message,
+                    json.dumps(context or {}, sort_keys=True),
+                ),
+            )
+
+    def get_successful_processing_fingerprints(self, shot: str) -> dict[str, str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT ph.unit_key, ph.input_fingerprint
+                FROM processing_history ph
+                INNER JOIN (
+                    SELECT unit_key, MAX(id) AS max_id
+                    FROM processing_history
+                    WHERE shot = ? AND status = 'completed'
+                    GROUP BY unit_key
+                ) latest
+                ON ph.id = latest.max_id
+                """,
+                (shot,),
+            ).fetchall()
+        return {row[0]: row[1] for row in rows}
