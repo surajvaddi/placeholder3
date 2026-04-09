@@ -11,6 +11,8 @@ from .dedupe import DedupeEngine
 from .models import OrgRecord, ParentEntity, RunMode
 from .models_seeds import ExpansionSeed, ParentSeed, SeedFamily, SeedRegistryEntry
 from .models_sources import OrgRecordCandidate, ParentEntityCandidate
+from .services.acceptance import evaluate_org_candidate
+from .services.confidence import score_org_candidate, score_parent_candidate
 from .services.fetcher import Fetcher
 from .services.normalizer import canonical_instagram, normalize_city, normalize_name, normalize_state
 from .services.policy import default_policy_registry
@@ -224,7 +226,7 @@ class TwoShotPipeline:
         started_at = _utc_now()
         discovered: list[OrgRecord] = []
         for unit in units:
-            records = asyncio.run(self._run_shot_two_connector(run_id, unit))
+            records, rejected_count = asyncio.run(self._run_shot_two_connector(run_id, unit))
             discovered.extend(records)
             self.storage.record_processing_history(
                 run_id=run_id,
@@ -241,6 +243,7 @@ class TwoShotPipeline:
                     "parent_name": unit.parent_entity.name,
                     "connector": unit.expansion_seed.connector,
                     "record_count": len(records),
+                    "rejected_count": rejected_count,
                 },
             )
         return discovered
@@ -336,7 +339,9 @@ class TwoShotPipeline:
             return self._build_parent_entity(unit.seed)
         return self._candidate_to_parent_entity(unit.seed, candidates[0])
 
-    async def _run_shot_two_connector(self, run_id: int, unit: ShotTwoUnit) -> list[OrgRecord]:
+    async def _run_shot_two_connector(
+        self, run_id: int, unit: ShotTwoUnit
+    ) -> tuple[list[OrgRecord], int]:
         connector = self.connectors[unit.expansion_seed.connector]
         async with Fetcher(
             policy_registry=self.policy_registry, connector_name=connector.connector_name
@@ -347,23 +352,42 @@ class TwoShotPipeline:
                 fetcher=fetcher,
                 context=ConnectorContext(run_id=run_id),
             )
-        return [self._candidate_to_org_record(candidate) for candidate in candidates]
+        accepted: list[OrgRecord] = []
+        rejected_count = 0
+        for candidate in candidates:
+            decision = evaluate_org_candidate(candidate)
+            if decision.outcome == "rejected":
+                rejected_count += 1
+                continue
+            candidate.review_flags = decision.review_flags
+            accepted.append(self._candidate_to_org_record(candidate, decision.outcome))
+        return accepted, rejected_count
 
     def _candidate_to_parent_entity(
         self, seed: ParentSeed, candidate: ParentEntityCandidate
     ) -> ParentEntity:
         parent_key = candidate.parent_key or self._build_parent_key(seed)
+        confidence_score, _ = score_parent_candidate(candidate)
         return ParentEntity(
             parent_key=parent_key,
             name=normalize_name(candidate.name),
             category=candidate.category,
             seed_type=candidate.seed_type or seed.seed_type,
             source_seed_id=candidate.source_seed_id or seed.seed_id,
+            confidence_score=confidence_score,
+            evidence_json=json.dumps([item.model_dump() for item in candidate.evidence], sort_keys=True),
             source_url=candidate.source_url or None,
-            notes=format_notes_from_evidence(candidate.evidence, [candidate.notes]),
+            notes=format_notes_from_evidence(
+                candidate.evidence,
+                [candidate.notes, f"confidence={confidence_score:.1f}"],
+            ),
         )
 
-    def _candidate_to_org_record(self, candidate: OrgRecordCandidate) -> OrgRecord:
+    def _candidate_to_org_record(
+        self, candidate: OrgRecordCandidate, acceptance_outcome: str
+    ) -> OrgRecord:
+        confidence_score, confidence_reasons = score_org_candidate(candidate)
+        merged_flags = sorted({flag.value for flag in candidate.review_flags})
         return OrgRecord(
             parent_key=candidate.parent_key,
             expansion_seed_id=candidate.expansion_seed_id,
@@ -377,5 +401,22 @@ class TwoShotPipeline:
             followers=candidate.followers,
             website=candidate.website,
             instagram=canonical_instagram(candidate.instagram),
-            notes=format_notes_from_evidence(candidate.evidence, [candidate.notes]),
+            confidence_score=confidence_score,
+            review_flags_json=json.dumps(merged_flags, sort_keys=True),
+            evidence_json=json.dumps([item.model_dump() for item in candidate.evidence], sort_keys=True),
+            source_count=len(candidate.evidence),
+            notes=format_notes_from_evidence(
+                candidate.evidence,
+                [
+                    candidate.notes,
+                    f"confidence={confidence_score:.1f}",
+                    f"acceptance={acceptance_outcome}",
+                    f"flags={','.join(merged_flags)}" if merged_flags else "",
+                    (
+                        f"confidence_reasons={','.join(confidence_reasons)}"
+                        if confidence_reasons
+                        else ""
+                    ),
+                ],
+            ),
         )

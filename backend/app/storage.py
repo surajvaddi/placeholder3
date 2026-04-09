@@ -43,6 +43,8 @@ class Storage:
                     category TEXT NOT NULL,
                     seed_type TEXT NOT NULL DEFAULT '',
                     source_seed_id TEXT NOT NULL DEFAULT '',
+                    confidence_score REAL NOT NULL DEFAULT 0,
+                    evidence_json TEXT NOT NULL DEFAULT '[]',
                     notes TEXT NOT NULL DEFAULT '',
                     source_url TEXT NOT NULL DEFAULT '',
                     FOREIGN KEY (run_id) REFERENCES runs(run_id)
@@ -53,6 +55,12 @@ class Storage:
             self._ensure_column(conn, "parent_entities", "seed_type", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(
                 conn, "parent_entities", "source_seed_id", "TEXT NOT NULL DEFAULT ''"
+            )
+            self._ensure_column(
+                conn, "parent_entities", "confidence_score", "REAL NOT NULL DEFAULT 0"
+            )
+            self._ensure_column(
+                conn, "parent_entities", "evidence_json", "TEXT NOT NULL DEFAULT '[]'"
             )
             conn.execute(
                 """
@@ -71,6 +79,10 @@ class Storage:
                     followers TEXT NOT NULL DEFAULT '',
                     website TEXT NOT NULL DEFAULT '',
                     instagram TEXT NOT NULL DEFAULT '',
+                    confidence_score REAL NOT NULL DEFAULT 0,
+                    review_flags_json TEXT NOT NULL DEFAULT '[]',
+                    evidence_json TEXT NOT NULL DEFAULT '[]',
+                    source_count INTEGER NOT NULL DEFAULT 0,
                     notes TEXT NOT NULL DEFAULT '',
                     status TEXT NOT NULL DEFAULT 'new',
                     FOREIGN KEY (run_id) REFERENCES runs(run_id)
@@ -80,6 +92,18 @@ class Storage:
             self._ensure_column(conn, "org_records", "parent_key", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(
                 conn, "org_records", "expansion_seed_id", "TEXT NOT NULL DEFAULT ''"
+            )
+            self._ensure_column(
+                conn, "org_records", "confidence_score", "REAL NOT NULL DEFAULT 0"
+            )
+            self._ensure_column(
+                conn, "org_records", "review_flags_json", "TEXT NOT NULL DEFAULT '[]'"
+            )
+            self._ensure_column(
+                conn, "org_records", "evidence_json", "TEXT NOT NULL DEFAULT '[]'"
+            )
+            self._ensure_column(
+                conn, "org_records", "source_count", "INTEGER NOT NULL DEFAULT 0"
             )
             conn.execute(
                 """
@@ -285,9 +309,10 @@ class Storage:
             conn.executemany(
                 """
                 INSERT INTO parent_entities (
-                    run_id, parent_key, name, category, seed_type, source_seed_id, notes, source_url
+                    run_id, parent_key, name, category, seed_type, source_seed_id,
+                    confidence_score, evidence_json, notes, source_url
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -297,6 +322,8 @@ class Storage:
                         e.category,
                         e.seed_type,
                         e.source_seed_id,
+                        e.confidence_score,
+                        e.evidence_json,
                         e.notes,
                         e.source_url or "",
                     )
@@ -311,9 +338,10 @@ class Storage:
                 """
                 INSERT INTO org_records (
                     run_id, parent_key, expansion_seed_id, email, name, business_name, category, location, city, state,
-                    followers, website, instagram, notes, status
+                    followers, website, instagram, confidence_score, review_flags_json, evidence_json,
+                    source_count, notes, status
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -330,6 +358,10 @@ class Storage:
                         r.followers,
                         r.website,
                         r.instagram,
+                        r.confidence_score,
+                        r.review_flags_json,
+                        r.evidence_json,
+                        r.source_count,
                         r.notes,
                         r.status.value,
                     )
@@ -377,7 +409,8 @@ class Storage:
             rows = conn.execute(
                 """
                 SELECT parent_key, expansion_seed_id, email, name, business_name, category, location, city, state,
-                       followers, website, instagram, notes, status
+                       followers, website, instagram, confidence_score, review_flags_json, evidence_json,
+                       source_count, notes, status
                 FROM org_records
                 WHERE run_id = ?
                 """,
@@ -397,8 +430,12 @@ class Storage:
                 followers=r[9],
                 website=r[10],
                 instagram=r[11],
-                notes=r[12],
-                status=RecordStatus(r[13]),
+                confidence_score=r[12],
+                review_flags_json=r[13],
+                evidence_json=r[14],
+                source_count=r[15],
+                notes=r[16],
+                status=RecordStatus(r[17]),
             )
             for r in rows
         ]

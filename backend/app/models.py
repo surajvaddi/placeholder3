@@ -23,6 +23,8 @@ class ParentEntity(BaseModel):
     category: str
     seed_type: str = ""
     source_seed_id: str = ""
+    confidence_score: float = 0.0
+    evidence_json: str = "[]"
     notes: str = ""
     source_url: Optional[str] = None
 
@@ -40,6 +42,10 @@ class OrgRecord(BaseModel):
     followers: str = ""
     website: str = ""
     instagram: str = ""
+    confidence_score: float = 0.0
+    review_flags_json: str = "[]"
+    evidence_json: str = "[]"
+    source_count: int = 0
     notes: str = ""
     status: RecordStatus = RecordStatus.new
 

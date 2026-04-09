@@ -1,4 +1,5 @@
 import re
+import json
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Tuple
 
@@ -126,23 +127,78 @@ class DedupeEngine:
         return score >= self.fuzzy_threshold
 
     def _merge_records(self, existing: OrgRecord, incoming: OrgRecord) -> OrgRecord:
+        primary, secondary = self._rank_records(existing, incoming)
+
         def pick(a: str, b: str) -> str:
             return a if a else b
 
-        return OrgRecord(
-            email=pick(existing.email, incoming.email),
-            name=pick(existing.name, incoming.name),
-            business_name=pick(existing.business_name, incoming.business_name),
-            category=pick(existing.category, incoming.category),
-            location=pick(existing.location, incoming.location),
-            city=pick(existing.city, incoming.city),
-            state=pick(existing.state, incoming.state),
-            followers=pick(existing.followers, incoming.followers),
-            website=pick(existing.website, incoming.website),
-            instagram=pick(existing.instagram, incoming.instagram),
-            notes=" | ".join(filter(None, [existing.notes, incoming.notes])),
-            status=existing.status,
+        merged_evidence_json = self._merge_json_object_lists(
+            existing.evidence_json, incoming.evidence_json
         )
+        merged_source_count = self._json_list_length(merged_evidence_json)
+
+        return OrgRecord(
+            parent_key=pick(primary.parent_key, secondary.parent_key),
+            expansion_seed_id=pick(primary.expansion_seed_id, secondary.expansion_seed_id),
+            email=pick(primary.email, secondary.email),
+            name=pick(primary.name, secondary.name),
+            business_name=pick(primary.business_name, secondary.business_name),
+            category=pick(primary.category, secondary.category),
+            location=pick(primary.location, secondary.location),
+            city=pick(primary.city, secondary.city),
+            state=pick(primary.state, secondary.state),
+            followers=pick(primary.followers, secondary.followers),
+            website=pick(primary.website, secondary.website),
+            instagram=pick(primary.instagram, secondary.instagram),
+            confidence_score=max(existing.confidence_score, incoming.confidence_score),
+            review_flags_json=self._merge_json_string_lists(
+                existing.review_flags_json, incoming.review_flags_json
+            ),
+            evidence_json=merged_evidence_json,
+            source_count=max(existing.source_count, incoming.source_count, merged_source_count),
+            notes=" | ".join(filter(None, [existing.notes, incoming.notes])),
+            status=primary.status,
+        )
+
+    def _rank_records(self, a: OrgRecord, b: OrgRecord) -> tuple[OrgRecord, OrgRecord]:
+        def score(record: OrgRecord) -> tuple[float, int, int, int]:
+            return (
+                record.confidence_score,
+                record.source_count,
+                int(bool(record.email)),
+                int(bool(record.website or record.instagram)),
+            )
+
+        if score(a) >= score(b):
+            return a, b
+        return b, a
+
+    def _merge_json_string_lists(self, a: str, b: str) -> str:
+        items = set()
+        for raw in (a, b):
+            try:
+                for value in json.loads(raw or "[]"):
+                    items.add(str(value))
+            except json.JSONDecodeError:
+                continue
+        return json.dumps(sorted(items))
+
+    def _merge_json_object_lists(self, a: str, b: str) -> str:
+        items: dict[str, dict] = {}
+        for raw in (a, b):
+            try:
+                for value in json.loads(raw or "[]"):
+                    key = json.dumps(value, sort_keys=True)
+                    items[key] = value
+            except json.JSONDecodeError:
+                continue
+        return json.dumps(list(items.values()), sort_keys=True)
+
+    def _json_list_length(self, raw: str) -> int:
+        try:
+            return len(json.loads(raw or "[]"))
+        except json.JSONDecodeError:
+            return 0
 
     def _refresh_indexes(
         self,
