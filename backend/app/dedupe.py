@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import json
 from dataclasses import dataclass
@@ -22,6 +24,11 @@ def _canonical_website(url: str) -> str:
     v = v.replace("https://", "").replace("http://", "")
     v = v.replace("www.", "")
     return v.rstrip("/")
+
+
+def _is_directory_like_website(url: str) -> bool:
+    canonical = _canonical_website(url)
+    return any(token in canonical for token in ("/chapter-directory", "/directory", "/chapters"))
 
 
 def _canonical_instagram(instagram: str) -> str:
@@ -99,7 +106,7 @@ class DedupeEngine:
             return email_idx[incoming.email.lower()]
 
         website = _canonical_website(incoming.website)
-        if website and website in website_idx:
+        if website and website in website_idx and not _is_directory_like_website(incoming.website):
             return website_idx[website]
 
         instagram = _canonical_instagram(incoming.instagram)

@@ -7,3 +7,5 @@ pyyaml
 pandas
 rapidfuzz
 httpx
+beautifulsoup4
+lxml

@@ -60,6 +60,21 @@ def run_records(run_id: int) -> list[dict]:
     return [record.to_csv_row() for record in storage.list_records(run_id)]
 
 
+@app.get("/runs/{run_id}/records/detail")
+def run_record_details(run_id: int) -> list[dict]:
+    return storage.list_record_details(run_id)
+
+
+@app.get("/runs/{run_id}/logs")
+def run_logs(run_id: int) -> list[dict]:
+    return storage.list_run_logs(run_id)
+
+
+@app.get("/runs/{run_id}/diagnostics")
+def run_diagnostics(run_id: int) -> dict:
+    return storage.get_run_diagnostics(run_id)
+
+
 @app.get("/runs/{run_id}/export")
 def export_run(run_id: int) -> FileResponse:
     csv_path = DATA_DIR / "exports" / f"run_{run_id}.csv"

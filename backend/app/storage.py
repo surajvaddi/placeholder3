@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 import json
 import sqlite3
@@ -439,6 +441,101 @@ class Storage:
             )
             for r in rows
         ]
+
+    def list_record_details(self, run_id: int) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT parent_key, expansion_seed_id, email, name, business_name, category, location, city, state,
+                       followers, website, instagram, confidence_score, review_flags_json, evidence_json,
+                       source_count, notes, status
+                FROM org_records
+                WHERE run_id = ?
+                ORDER BY confidence_score DESC, business_name
+                """,
+                (run_id,),
+            ).fetchall()
+        details: list[dict] = []
+        for row in rows:
+            review_flags = json.loads(row[13] or "[]")
+            evidence = json.loads(row[14] or "[]")
+            details.append(
+                {
+                    "parent_key": row[0],
+                    "expansion_seed_id": row[1],
+                    "email": row[2],
+                    "name": row[3],
+                    "business_name": row[4],
+                    "category": row[5],
+                    "location": row[6],
+                    "city": row[7],
+                    "state": row[8],
+                    "followers": row[9],
+                    "website": row[10],
+                    "instagram": row[11],
+                    "confidence_score": row[12],
+                    "review_flags": review_flags,
+                    "evidence_count": len(evidence),
+                    "source_count": row[15],
+                    "notes": row[16],
+                    "status": row[17],
+                }
+            )
+        return details
+
+    def list_run_logs(self, run_id: int) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT shot, unit_key, seed_id, expansion_seed_id, status, input_fingerprint,
+                       started_at, completed_at, error_message, context_json
+                FROM processing_history
+                WHERE run_id = ?
+                ORDER BY id ASC
+                """,
+                (run_id,),
+            ).fetchall()
+        logs: list[dict] = []
+        for row in rows:
+            logs.append(
+                {
+                    "shot": row[0],
+                    "unit_key": row[1],
+                    "seed_id": row[2],
+                    "expansion_seed_id": row[3],
+                    "status": row[4],
+                    "input_fingerprint": row[5],
+                    "started_at": row[6],
+                    "completed_at": row[7],
+                    "error_message": row[8],
+                    "context": json.loads(row[9] or "{}"),
+                }
+            )
+        return logs
+
+    def get_run_diagnostics(self, run_id: int) -> dict:
+        records = self.list_record_details(run_id)
+        logs = self.list_run_logs(run_id)
+        review_count = sum(1 for record in records if record["review_flags"])
+        average_confidence = (
+            round(sum(record["confidence_score"] for record in records) / len(records), 2)
+            if records
+            else 0.0
+        )
+        rejected_count = sum(
+            int(log["context"].get("rejected_count", 0)) for log in logs if log["shot"] == "shot2"
+        )
+        return {
+            "summary": {
+                "record_count": len(records),
+                "review_count": review_count,
+                "average_confidence": average_confidence,
+                "rejected_count": rejected_count,
+                "log_count": len(logs),
+            },
+            "logs": logs,
+            "records": records[:100],
+        }
 
     def record_processing_history(
         self,

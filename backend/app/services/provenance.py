@@ -1,4 +1,6 @@
-from .models_sources import Evidence
+from __future__ import annotations
+
+from ..models_sources import Evidence
 
 
 def format_notes_from_evidence(evidence: list[Evidence], extra_notes: list[str] | None = None) -> str:

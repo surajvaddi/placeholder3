@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -70,12 +72,12 @@ class RunCreateRequest(BaseModel):
     run_name: str = Field(min_length=2, max_length=100)
     notes: str = ""
     mode: RunMode = RunMode.incremental
-    seed_ids: list[str] = Field(default_factory=list)
+    seed_ids: List[str] = Field(default_factory=list)
 
     @property
-    def normalized_seed_ids(self) -> list[str]:
+    def normalized_seed_ids(self) -> List[str]:
         seen: set[str] = set()
-        values: list[str] = []
+        values: List[str] = []
         for seed_id in self.seed_ids:
             normalized = seed_id.strip()
             if not normalized:

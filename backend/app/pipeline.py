@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import asyncio
@@ -186,6 +188,13 @@ class TwoShotPipeline:
                     or expansion_seed.seed_id.lower() in requested_seed_ids
                 ):
                     continue
+                if (
+                    mode == RunMode.seed_targeted
+                    and parent_seed.seed_id.lower() in requested_seed_ids
+                    and expansion_seed.seed_id.lower() not in requested_seed_ids
+                    and any(seed_id.startswith("expand_") for seed_id in requested_seed_ids)
+                ):
+                    continue
 
                 unit_key = f"{parent_entity.parent_key}::{expansion_seed.seed_id}"
                 fingerprint = _stable_hash(
@@ -326,7 +335,8 @@ class TwoShotPipeline:
             )
 
     async def _run_shot_one_connector(self, run_id: int, unit: ShotOneUnit) -> ParentEntity:
-        connector = self.connectors["mock_parent_directory"]
+        connector_name = self._shot_one_connector_name(unit.seed)
+        connector = self.connectors[connector_name]
         async with Fetcher(
             policy_registry=self.policy_registry, connector_name=connector.connector_name
         ) as fetcher:
@@ -382,6 +392,11 @@ class TwoShotPipeline:
                 [candidate.notes, f"confidence={confidence_score:.1f}"],
             ),
         )
+
+    def _shot_one_connector_name(self, seed: ParentSeed) -> str:
+        if "sacnas_official_directory" in seed.source_hints:
+            return "sacnas_parent_directory"
+        return "mock_parent_directory"
 
     def _candidate_to_org_record(
         self, candidate: OrgRecordCandidate, acceptance_outcome: str

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..models_sources import OrgRecordCandidate, ParentEntityCandidate, ReviewFlag
 
 

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -28,7 +29,7 @@ class ParentEntityCandidate(BaseModel):
     source_url: str = ""
     notes: str = ""
     confidence_score: float = 0.0
-    evidence: list[Evidence] = Field(default_factory=list)
+    evidence: List[Evidence] = Field(default_factory=list)
 
 
 class OrgRecordCandidate(BaseModel):
@@ -46,5 +47,5 @@ class OrgRecordCandidate(BaseModel):
     instagram: str = ""
     notes: str = ""
     confidence_score: float = 0.0
-    review_flags: list[ReviewFlag] = Field(default_factory=list)
-    evidence: list[Evidence] = Field(default_factory=list)
+    review_flags: List[ReviewFlag] = Field(default_factory=list)
+    evidence: List[Evidence] = Field(default_factory=list)

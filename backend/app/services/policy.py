@@ -57,6 +57,20 @@ def default_policy_registry() -> PolicyRegistry:
                 allow_html=True,
                 allow_json=True,
                 notes="Local mock policy used during architecture phases.",
+            ),
+            SourcePolicy(
+                tag="sacnas_official",
+                host_patterns=("www.sacnas.org", "sacnas.org"),
+                allowed_connector_names=(
+                    "sacnas_parent_directory",
+                    "sacnas_chapter_directory",
+                ),
+                robots_required=True,
+                min_delay_seconds=1.0,
+                max_requests_per_run=20,
+                allow_html=True,
+                allow_json=False,
+                notes="Official SACNAS chapter directory access.",
             )
         ]
     )

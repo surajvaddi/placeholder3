@@ -47,6 +47,22 @@ parent_seeds:
     notes: collegiate chapters
     updated_at: 2026-04-09
 
+  - seed_id: parent_sacnas
+    name: SACNAS
+    category: intercollegiate_organizations
+    seed_type: national_org
+    aliases:
+      - Society for Advancement of Chicanos/Hispanics and Native Americans in Science
+    enabled: true
+    priority: 10
+    source_hints:
+      - sacnas_official_directory
+    tags:
+      - stem
+      - chapters
+    notes: official chapter directory available on sacnas.org
+    updated_at: 2026-04-09
+
   - seed_id: parent_big_ten
     name: Big Ten Conference
     category: conferences

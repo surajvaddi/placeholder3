@@ -90,6 +90,29 @@ expansion_seeds:
     notes: club sports roster expansion
     updated_at: 2026-04-09
 
+  - seed_id: expand_sacnas_chapter_directory
+    connector: sacnas_chapter_directory
+    applies_to:
+      seed_ids:
+        - parent_sacnas
+      categories:
+        - intercollegiate_organizations
+      seed_types:
+        - national_org
+    enabled: true
+    priority: 10
+    discovery_mode: official_chapter_directory
+    host_patterns:
+      - "www.sacnas.org"
+      - "sacnas.org"
+    source_hints:
+      - sacnas_official_directory
+    limits:
+      max_requests_per_parent: 3
+      max_results_per_parent: 250
+    notes: real SACNAS chapter directory connector
+    updated_at: 2026-04-09
+
   - seed_id: expand_greek_life_directory
     connector: greek_life_directory
     applies_to:
