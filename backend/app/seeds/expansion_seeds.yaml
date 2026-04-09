@@ -1,0 +1,145 @@
+version: 1
+expansion_seeds:
+  - seed_id: expand_official_campus_directory
+    connector: campus_directory
+    applies_to:
+      categories:
+        - intercollegiate_organizations
+        - cultural_clubs_and_organizations
+        - honor_councils_committees
+      seed_types:
+        - national_org
+        - network
+    enabled: true
+    priority: 10
+    discovery_mode: official_directory_only
+    host_patterns:
+      - "*.edu"
+    source_hints:
+      - student_org_directory
+    limits:
+      max_requests_per_parent: 10
+      max_results_per_parent: 100
+    notes: primary campus directory expansion path
+    updated_at: 2026-04-09
+
+  - seed_id: expand_conference_members
+    connector: parent_membership_page
+    applies_to:
+      categories:
+        - conferences
+      seed_types:
+        - conference
+    enabled: true
+    priority: 10
+    discovery_mode: official_member_pages
+    host_patterns:
+      - "*.org"
+      - "*.com"
+    source_hints:
+      - official_members_page
+    limits:
+      max_requests_per_parent: 5
+      max_results_per_parent: 200
+    notes: use official conference membership pages to discover member schools
+    updated_at: 2026-04-09
+
+  - seed_id: expand_competition_participants
+    connector: competition_directory
+    applies_to:
+      categories:
+        - competitions
+        - model_united_nations
+        - debate_organizations
+      seed_types:
+        - competition
+    enabled: true
+    priority: 9
+    discovery_mode: official_participant_pages
+    host_patterns:
+      - "*.org"
+      - "*.edu"
+      - "*.com"
+    source_hints:
+      - participant_directory
+    limits:
+      max_requests_per_parent: 8
+      max_results_per_parent: 150
+    notes: participant and chapter discovery path
+    updated_at: 2026-04-09
+
+  - seed_id: expand_club_sports_directory
+    connector: club_sports_directory
+    applies_to:
+      categories:
+        - club_sports
+      seed_types:
+        - national_org
+    enabled: true
+    priority: 9
+    discovery_mode: official_club_sports_pages
+    host_patterns:
+      - "*.org"
+      - "*.edu"
+      - "*.com"
+    source_hints:
+      - official_directory
+    limits:
+      max_requests_per_parent: 8
+      max_results_per_parent: 150
+    notes: club sports roster expansion
+    updated_at: 2026-04-09
+
+  - seed_id: expand_greek_life_directory
+    connector: greek_life_directory
+    applies_to:
+      categories:
+        - fraternity_sorority
+      seed_types:
+        - fraternity_sorority
+    enabled: true
+    priority: 9
+    discovery_mode: official_chapter_pages
+    host_patterns:
+      - "*.org"
+      - "*.edu"
+      - "*.com"
+    source_hints:
+      - official_directory
+      - chapter_locator
+    limits:
+      max_requests_per_parent: 8
+      max_results_per_parent: 200
+    notes: fraternity and sorority chapter expansion path
+    updated_at: 2026-04-09
+
+  - seed_id: expand_public_social_enrichment
+    connector: social_public
+    applies_to:
+      seed_ids:
+        - parent_nsbe
+        - parent_swe
+        - parent_pbl
+        - parent_npda
+        - parent_ceda
+        - parent_alpha_phi_alpha
+        - parent_delta_sigma_theta
+        - parent_sigma_chi
+        - parent_kappa_alpha_theta
+        - parent_phi_mu
+      tags:
+        - cultural
+        - greek_life
+    enabled: true
+    priority: 5
+    discovery_mode: enrich_existing_only
+    host_patterns:
+      - "instagram.com"
+      - "www.instagram.com"
+    source_hints:
+      - public_social_profile
+    limits:
+      max_requests_per_parent: 5
+      max_results_per_parent: 50
+    notes: reserved for later enrichment, not primary discovery
+    updated_at: 2026-04-09

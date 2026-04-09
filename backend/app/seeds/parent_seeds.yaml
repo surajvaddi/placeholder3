@@ -1,0 +1,402 @@
+version: 1
+parent_seeds:
+  - seed_id: parent_nsbe
+    name: National Society of Black Engineers
+    category: intercollegiate_organizations
+    seed_type: national_org
+    aliases:
+      - NSBE
+    enabled: true
+    priority: 10
+    source_hints:
+      - official_directory
+    tags:
+      - engineering
+      - chapters
+    notes: strong seed with known chapter model
+    updated_at: 2026-04-09
+
+  - seed_id: parent_swe
+    name: Society of Women Engineers
+    category: intercollegiate_organizations
+    seed_type: national_org
+    aliases:
+      - SWE
+    enabled: true
+    priority: 10
+    source_hints:
+      - official_directory
+    tags:
+      - engineering
+      - chapters
+    notes: national org seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_pbl
+    name: Phi Beta Lambda
+    category: intercollegiate_organizations
+    seed_type: national_org
+    aliases:
+      - PBL
+    enabled: true
+    priority: 9
+    source_hints:
+      - official_directory
+    tags:
+      - business
+    notes: collegiate chapters
+    updated_at: 2026-04-09
+
+  - seed_id: parent_big_ten
+    name: Big Ten Conference
+    category: conferences
+    seed_type: conference
+    aliases:
+      - B1G
+    enabled: true
+    priority: 10
+    source_hints:
+      - official_members_page
+    tags:
+      - athletics
+    notes: conference member expansion source
+    updated_at: 2026-04-09
+
+  - seed_id: parent_acc
+    name: Atlantic Coast Conference
+    category: conferences
+    seed_type: conference
+    aliases:
+      - ACC
+    enabled: true
+    priority: 10
+    source_hints:
+      - official_members_page
+    tags:
+      - athletics
+    notes: conference member expansion source
+    updated_at: 2026-04-09
+
+  - seed_id: parent_sec
+    name: Southeastern Conference
+    category: conferences
+    seed_type: conference
+    aliases:
+      - SEC
+    enabled: true
+    priority: 10
+    source_hints:
+      - official_members_page
+    tags:
+      - athletics
+    notes: conference member expansion source
+    updated_at: 2026-04-09
+
+  - seed_id: parent_acm_icpc
+    name: ACM International Collegiate Programming Contest
+    category: competitions
+    seed_type: competition
+    aliases:
+      - ICPC
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - engineering
+      - competition
+    notes: collegiate competition circuit
+    updated_at: 2026-04-09
+
+  - seed_id: parent_national_model_un
+    name: National Model United Nations
+    category: model_united_nations
+    seed_type: competition
+    aliases:
+      - NMUN
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - diplomacy
+      - competition
+    notes: collegiate MUN conference network
+    updated_at: 2026-04-09
+
+  - seed_id: parent_american_debate_association
+    name: American Debate Association Circuit
+    category: debate_organizations
+    seed_type: competition
+    aliases:
+      - ADA
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - debate
+      - competition
+    notes: debate circuit seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_world_of_dance
+    name: World of Dance Collegiate Network
+    category: dance_organizations
+    seed_type: network
+    aliases: []
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - dance
+    notes: collegiate dance network
+    updated_at: 2026-04-09
+
+  - seed_id: parent_nda_college_dance
+    name: NDA College Dance
+    category: dance_organizations
+    seed_type: network
+    aliases:
+      - National Dance Alliance College Dance
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - dance
+    notes: dance competition and directory source
+    updated_at: 2026-04-09
+
+  - seed_id: parent_national_collegiate_rugby
+    name: National Collegiate Rugby
+    category: club_sports
+    seed_type: national_org
+    aliases: []
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - sports
+      - rugby
+    notes: club sports governing body
+    updated_at: 2026-04-09
+
+  - seed_id: parent_usa_ultimate_college
+    name: USA Ultimate College
+    category: club_sports
+    seed_type: national_org
+    aliases:
+      - USA Ultimate
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - sports
+      - ultimate
+    notes: college division source
+    updated_at: 2026-04-09
+
+  - seed_id: parent_harvard_national_model_un
+    name: Harvard National Model United Nations
+    category: model_united_nations
+    seed_type: competition
+    aliases:
+      - HNMUN
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - diplomacy
+      - competition
+    notes: conference seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_npda
+    name: National Parliamentary Debate Association
+    category: debate_organizations
+    seed_type: national_org
+    aliases:
+      - NPDA
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - debate
+    notes: debate organization seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_ceda
+    name: Cross Examination Debate Association
+    category: debate_organizations
+    seed_type: national_org
+    aliases:
+      - CEDA
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - debate
+    notes: debate organization seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_alpha_phi_alpha
+    name: Alpha Phi Alpha Fraternity, Inc.
+    category: fraternity_sorority
+    seed_type: fraternity_sorority
+    aliases:
+      - Alpha Phi Alpha
+      - ΑΦΑ
+    enabled: true
+    priority: 9
+    source_hints:
+      - official_directory
+    tags:
+      - greek_life
+      - fraternity
+    notes: historically significant intercollegiate fraternity with chapter network
+    updated_at: 2026-04-09
+
+  - seed_id: parent_delta_sigma_theta
+    name: Delta Sigma Theta Sorority, Inc.
+    category: fraternity_sorority
+    seed_type: fraternity_sorority
+    aliases:
+      - Delta Sigma Theta
+      - ΔΣΘ
+    enabled: true
+    priority: 9
+    source_hints:
+      - official_directory
+    tags:
+      - greek_life
+      - sorority
+    notes: sorority chapter network seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_sigma_chi
+    name: Sigma Chi Fraternity
+    category: fraternity_sorority
+    seed_type: fraternity_sorority
+    aliases:
+      - Sigma Chi
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - greek_life
+      - fraternity
+    notes: fraternity chapter network seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_kappa_alpha_theta
+    name: Kappa Alpha Theta
+    category: fraternity_sorority
+    seed_type: fraternity_sorority
+    aliases:
+      - Theta
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - greek_life
+      - sorority
+    notes: sorority chapter network seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_phi_mu
+    name: Phi Mu Fraternity
+    category: fraternity_sorority
+    seed_type: fraternity_sorority
+    aliases:
+      - Phi Mu
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - greek_life
+      - sorority
+    notes: Greek life chapter network seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_honor_council_network
+    name: University Honor Council Network
+    category: honor_councils_committees
+    seed_type: network
+    aliases: []
+    enabled: true
+    priority: 6
+    source_hints:
+      - official_directory
+    tags:
+      - governance
+    notes: judicial and honor council network seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_judicial_affairs_boards
+    name: Judicial Affairs Student Boards
+    category: honor_councils_committees
+    seed_type: network
+    aliases: []
+    enabled: true
+    priority: 6
+    source_hints:
+      - official_directory
+    tags:
+      - governance
+    notes: judicial board seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_south_asian_student_alliance
+    name: South Asian Student Alliance
+    category: cultural_clubs_and_organizations
+    seed_type: network
+    aliases:
+      - SASA
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - cultural
+    notes: cultural organization seed
+    updated_at: 2026-04-09
+
+  - seed_id: parent_black_student_union
+    name: Black Student Union
+    category: cultural_clubs_and_organizations
+    seed_type: network
+    aliases:
+      - BSU
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - cultural
+    notes: umbrella cultural club pattern
+    updated_at: 2026-04-09
+
+  - seed_id: parent_latinx_student_union
+    name: Latinx Student Union
+    category: cultural_clubs_and_organizations
+    seed_type: network
+    aliases:
+      - LSU
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - cultural
+    notes: umbrella cultural club pattern
+    updated_at: 2026-04-09

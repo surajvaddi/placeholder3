@@ -11,7 +11,8 @@ from .storage import Storage
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "prospects.db"
-SEED_PATH = ROOT / "app" / "seeds" / "default_seed_categories.yaml"
+PARENT_SEED_PATH = ROOT / "app" / "seeds" / "parent_seeds.yaml"
+EXPANSION_SEED_PATH = ROOT / "app" / "seeds" / "expansion_seeds.yaml"
 
 app = FastAPI(title="Collegiate Prospecting API", version="0.1.0")
 app.add_middleware(
@@ -23,7 +24,11 @@ app.add_middleware(
 )
 
 storage = Storage(DB_PATH)
-pipeline = TwoShotPipeline(storage=storage, seed_file=SEED_PATH)
+pipeline = TwoShotPipeline(
+    storage=storage,
+    parent_seed_file=PARENT_SEED_PATH,
+    expansion_seed_file=EXPANSION_SEED_PATH,
+)
 
 
 @app.get("/health")
@@ -38,8 +43,10 @@ def list_runs() -> list[dict]:
 
 @app.post("/runs")
 def create_run(payload: RunCreateRequest) -> dict:
-    run_id = storage.create_run(payload.run_name, notes=payload.notes)
-    stats = pipeline.run(run_id)
+    run_id = storage.create_run(
+        payload.run_name, notes=payload.notes, run_mode=payload.mode
+    )
+    stats = pipeline.run(run_id, mode=payload.mode, seed_ids=payload.normalized_seed_ids)
     run = next((r for r in storage.list_runs() if r.run_id == run_id), None)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found after creation.")

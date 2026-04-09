@@ -3,7 +3,8 @@ import sqlite3
 from pathlib import Path
 from typing import Iterable, List
 
-from .models import OrgRecord, ParentEntity, RecordStatus, RunResponse
+from .models import OrgRecord, ParentEntity, RecordStatus, RunMode, RunResponse
+from .models_seeds import SeedFamily, SeedRegistryEntry, SeedRegistryStatus
 
 
 class Storage:
@@ -30,6 +31,7 @@ class Storage:
                 )
                 """
             )
+            self._ensure_column(conn, "runs", "run_mode", "TEXT NOT NULL DEFAULT 'incremental'")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS parent_entities (
@@ -64,15 +66,42 @@ class Storage:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS seed_registry (
+                    seed_id TEXT NOT NULL,
+                    seed_family TEXT NOT NULL,
+                    fingerprint TEXT NOT NULL,
+                    enabled INTEGER NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    last_processed_run_id INTEGER,
+                    last_processed_fingerprint TEXT,
+                    last_success_at TEXT,
+                    status TEXT NOT NULL,
+                    PRIMARY KEY (seed_id, seed_family)
+                )
+                """
+            )
 
-    def create_run(self, run_name: str, notes: str = "") -> int:
+    def _ensure_column(
+        self, conn: sqlite3.Connection, table_name: str, column_name: str, column_sql: str
+    ) -> None:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        existing_columns = {row[1] for row in rows}
+        if column_name not in existing_columns:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}")
+
+    def create_run(
+        self, run_name: str, notes: str = "", run_mode: RunMode = RunMode.incremental
+    ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO runs (run_name, status, notes)
-                VALUES (?, 'queued', ?)
+                INSERT INTO runs (run_name, status, notes, run_mode)
+                VALUES (?, 'queued', ?, ?)
                 """,
-                (run_name, notes),
+                (run_name, notes, run_mode.value),
             )
             return int(cursor.lastrowid)
 
@@ -106,7 +135,7 @@ class Storage:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT run_id, run_name, status, parent_entity_count, discovered_club_count, deduped_count, notes
+                SELECT run_id, run_name, status, run_mode, parent_entity_count, discovered_club_count, deduped_count, notes
                 FROM runs
                 ORDER BY run_id DESC
                 """
@@ -116,13 +145,100 @@ class Storage:
                 run_id=r[0],
                 run_name=r[1],
                 status=r[2],
-                parent_entity_count=r[3],
-                discovered_club_count=r[4],
-                deduped_count=r[5],
-                notes=r[6],
+                run_mode=RunMode(r[3] or RunMode.incremental.value),
+                parent_entity_count=r[4],
+                discovered_club_count=r[5],
+                deduped_count=r[6],
+                notes=r[7],
             )
             for r in rows
         ]
+
+    def get_seed_registry_entries(self) -> List[SeedRegistryEntry]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT seed_id, seed_family, fingerprint, enabled, payload_json, last_seen_at,
+                       last_processed_run_id, last_processed_fingerprint, last_success_at, status
+                FROM seed_registry
+                """
+            ).fetchall()
+        return [
+            SeedRegistryEntry(
+                seed_id=row[0],
+                seed_family=SeedFamily(row[1]),
+                fingerprint=row[2],
+                enabled=bool(row[3]),
+                payload_json=row[4],
+                last_seen_at=row[5],
+                last_processed_run_id=row[6],
+                last_processed_fingerprint=row[7],
+                last_success_at=row[8],
+                status=SeedRegistryStatus(row[9]),
+            )
+            for row in rows
+        ]
+
+    def upsert_seed_registry_entries(self, entries: Iterable[SeedRegistryEntry]) -> None:
+        with self._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO seed_registry (
+                    seed_id, seed_family, fingerprint, enabled, payload_json, last_seen_at,
+                    last_processed_run_id, last_processed_fingerprint, last_success_at, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(seed_id, seed_family) DO UPDATE SET
+                    fingerprint=excluded.fingerprint,
+                    enabled=excluded.enabled,
+                    payload_json=excluded.payload_json,
+                    last_seen_at=excluded.last_seen_at,
+                    status=excluded.status
+                """,
+                [
+                    (
+                        entry.seed_id,
+                        entry.seed_family.value,
+                        entry.fingerprint,
+                        int(entry.enabled),
+                        entry.payload_json,
+                        entry.last_seen_at,
+                        entry.last_processed_run_id,
+                        entry.last_processed_fingerprint,
+                        entry.last_success_at,
+                        entry.status.value,
+                    )
+                    for entry in entries
+                ],
+            )
+
+    def mark_seed_processed(
+        self,
+        run_id: int,
+        seed_id: str,
+        seed_family: SeedFamily,
+        fingerprint: str,
+        processed_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE seed_registry
+                SET last_processed_run_id=?,
+                    last_processed_fingerprint=?,
+                    last_success_at=?,
+                    status=?
+                WHERE seed_id=? AND seed_family=?
+                """,
+                (
+                    run_id,
+                    fingerprint,
+                    processed_at,
+                    SeedRegistryStatus.active.value,
+                    seed_id,
+                    seed_family.value,
+                ),
+            )
 
     def save_parent_entities(self, run_id: int, entities: Iterable[ParentEntity]) -> None:
         with self._connect() as conn:
