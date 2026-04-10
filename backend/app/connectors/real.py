@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import List, Sequence, Set, Tuple
+from typing import List, Optional, Sequence, Set, Tuple
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
@@ -45,6 +45,8 @@ NON_SCHOOL_ALLOWLIST = {
     "ucla",
     "usc",
 }
+SOCIAL_HOST_MARKERS = ("instagram.com", "www.instagram.com")
+EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
 NOISE_TOKENS = {
     "about",
     "account",
@@ -315,7 +317,68 @@ def _clean_candidate_text(value: str) -> str:
     text = _normalize_space(value)
     text = re.sub(r"\s+\|\s+.*$", "", text)
     text = re.sub(r"\s+-\s+official.*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+@[a-z0-9._]{2,}\b", "", text, flags=re.IGNORECASE)
     return text.strip(" -:")
+
+
+def _clean_url(url: str) -> str:
+    return url.strip()
+
+
+def _is_instagram_url(url: str) -> bool:
+    lower = url.lower()
+    return any(marker in lower for marker in SOCIAL_HOST_MARKERS)
+
+
+def _is_mailto_url(url: str) -> bool:
+    return url.lower().startswith("mailto:")
+
+
+def _best_container(element):
+    container = element
+    for tag_name in ("li", "tr", "article", "section", "div", "p"):
+        candidate = element.find_parent(tag_name)
+        if candidate is None:
+            continue
+        text = _normalize_space(candidate.get_text(" ", strip=True))
+        if text and len(text) <= 600:
+            container = candidate
+            break
+    return container
+
+
+def _extract_email(text: str, container) -> str:
+    for anchor in container.find_all("a", href=True):
+        href = anchor["href"].strip()
+        if _is_mailto_url(href):
+            return href.split(":", 1)[1].strip()
+    match = EMAIL_RE.search(text)
+    return match.group(0) if match else ""
+
+
+def _extract_instagram(container) -> str:
+    for anchor in container.find_all("a", href=True):
+        href = _clean_url(anchor["href"])
+        if _is_instagram_url(href):
+            return href
+    text = _normalize_space(container.get_text(" ", strip=True))
+    match = re.search(r"@([a-z0-9._]{2,})", text, flags=re.IGNORECASE)
+    if match:
+        return f"https://instagram.com/{match.group(1)}"
+    return ""
+
+
+def _extract_website(container, page_url: str) -> str:
+    for anchor in container.find_all("a", href=True):
+        href = _clean_url(urljoin(page_url, anchor["href"]))
+        if not href.startswith(("http://", "https://")):
+            continue
+        if _is_instagram_url(href):
+            continue
+        if _same_host(page_url, href) and any(token in href.lower() for token in ("/organizations", "/student-", "/clubs", "/engage", "/presence")):
+            continue
+        return href
+    return ""
 
 
 def _looks_like_school_name(value: str) -> bool:
@@ -339,6 +402,8 @@ def _is_noise(value: str) -> bool:
     if not text:
         return True
     if text in NOISE_TOKENS:
+        return True
+    if text.startswith("@"):
         return True
     if text.startswith(("find ", "view ", "learn ", "explore ")):
         return True
@@ -450,19 +515,68 @@ def _extract_chapter_name(parent: ParentEntity, candidate: str, context: Connect
     return ""
 
 
+def _extract_record_signals(
+    parent: ParentEntity,
+    candidate: str,
+    element,
+    page_url: str,
+    context: ConnectorContext,
+) -> Optional[dict]:
+    chapter_name = _extract_chapter_name(parent, candidate, context)
+    if not chapter_name:
+        return None
+    container = _best_container(element)
+    container_text = _normalize_space(container.get_text(" ", strip=True))
+    return {
+        "business_name": chapter_name,
+        "email": _extract_email(container_text, container),
+        "instagram": _extract_instagram(container),
+        "website": _extract_website(container, page_url),
+    }
+
+
 def _extract_chapter_names(
     parent: ParentEntity,
     pages: Sequence[Tuple[str, BeautifulSoup]],
     context: ConnectorContext,
-) -> List[Tuple[str, str]]:
-    results: List[Tuple[str, str]] = []
+) -> List[Tuple[str, str, str, str, str]]:
+    results: List[Tuple[str, str, str, str, str]] = []
     for page_url, soup in pages:
-        for block in _text_blocks(soup):
-            for candidate in _split_candidate_names(block):
-                chapter_name = _extract_chapter_name(parent, candidate, context)
-                if chapter_name:
-                    results.append((chapter_name, page_url))
-    return _dedupe_pairs(results)[:MAX_RECORDS_PER_PAGE_SET]
+        for element in soup.find_all(["a", "li", "option", "p", "td", "h1", "h2", "h3", "h4", "span"]):
+            if element.name != "a":
+                child_anchor_texts = [
+                    _normalize_space(anchor.get_text(" ", strip=True))
+                    for anchor in element.find_all("a", href=True)
+                ]
+                if any(
+                    _extract_chapter_name(parent, anchor_text, context)
+                    for anchor_text in child_anchor_texts
+                ):
+                    continue
+            text = _normalize_space(element.get_text(" ", strip=True))
+            if not text:
+                continue
+            for candidate in _split_candidate_names(text):
+                signals = _extract_record_signals(parent, candidate, element, page_url, context)
+                if signals:
+                    results.append(
+                        (
+                            signals["business_name"],
+                            page_url,
+                            signals["email"],
+                            signals["instagram"],
+                            signals["website"],
+                        )
+                    )
+    deduped: List[Tuple[str, str, str, str, str]] = []
+    seen: Set[str] = set()
+    for business_name, source_url, email, instagram, website in results:
+        key = business_name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((business_name, source_url, email, instagram, website))
+    return deduped[:MAX_RECORDS_PER_PAGE_SET]
 
 
 class OfficialSeedPageConnector:
@@ -758,7 +872,9 @@ class GenericDirectoryExpansionConnector:
         context: ConnectorContext,
     ) -> List[OrgRecordCandidate]:
         records: List[OrgRecordCandidate] = []
-        for chapter_name, source_url in _extract_chapter_names(parent, pages, context):
+        for chapter_name, source_url, email, instagram, website in _extract_chapter_names(
+            parent, pages, context
+        ):
             records.append(
                 OrgRecordCandidate(
                     parent_key=parent.parent_key,
@@ -766,7 +882,9 @@ class GenericDirectoryExpansionConnector:
                     name=chapter_name,
                     business_name=chapter_name,
                     category=parent.category,
-                    website=source_url,
+                    email=email,
+                    website=website or source_url,
+                    instagram=instagram,
                     notes=f"discovered from official directory for {parent.name}",
                     evidence=[
                         Evidence(
@@ -780,3 +898,8 @@ class GenericDirectoryExpansionConnector:
                 )
             )
         return records
+
+
+class SocialPublicConnector(GenericDirectoryExpansionConnector):
+    def __init__(self):
+        super().__init__("social_public")

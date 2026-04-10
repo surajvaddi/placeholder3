@@ -8,6 +8,7 @@ from .real import (
     OfficialSeedPageConnector,
     SacnasChapterDirectoryConnector,
     SacnasParentDirectoryConnector,
+    SocialPublicConnector,
 )
 
 
@@ -22,5 +23,5 @@ def build_connector_registry() -> Dict[str, object]:
         "competition_directory": GenericDirectoryExpansionConnector("competition_directory"),
         "club_sports_directory": GenericDirectoryExpansionConnector("club_sports_directory"),
         "greek_life_directory": GenericDirectoryExpansionConnector("greek_life_directory"),
-        "social_public": MockExpansionConnector("social_public"),
+        "social_public": SocialPublicConnector(),
     }
