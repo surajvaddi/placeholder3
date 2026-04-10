@@ -1,11 +1,13 @@
 :root {
   color-scheme: light;
-  font-family: Inter, system-ui, Arial, sans-serif;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 
 body {
   margin: 0;
-  background: #f5f7fb;
+  background:
+    radial-gradient(circle at top left, rgba(14, 116, 144, 0.16), transparent 26%),
+    linear-gradient(180deg, #f5f7fb 0%, #eef4f2 100%);
   color: #111827;
 }
 
@@ -30,6 +32,7 @@ h1 {
   padding: 1rem;
   margin: 1rem 0;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 label {
@@ -73,6 +76,7 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 760px;
 }
 
 th,
@@ -96,4 +100,102 @@ td {
 .stack {
   margin: 0;
   padding-left: 1.2rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.metric-card {
+  padding: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef6f4 100%);
+  border: 1px solid #d8e3e0;
+}
+
+.metric-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.4rem;
+}
+
+.mini-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0.9rem 0 0;
+}
+
+.mini-stats dt {
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.mini-stats dd {
+  margin: 0.2rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.seed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.seed-list li {
+  padding: 0.9rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+.seed-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.muted {
+  color: #4b5563;
+}
+
+code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.9em;
+}
+
+a {
+  color: #0f766e;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 1.25rem 0.75rem 2rem;
+  }
+
+  .card {
+    padding: 0.9rem;
+  }
 }

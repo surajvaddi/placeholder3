@@ -93,36 +93,28 @@ class SacnasChapterDirectoryConnector:
     ) -> list[OrgRecordCandidate]:
         page = await fetcher.get_text(SACNAS_DIRECTORY_URL, policy_tag="sacnas_official")
         soup = BeautifulSoup(page.text, "lxml")
-        container = soup.get_text("\n")
-        lines = [normalize_name(line) for line in container.splitlines()]
+        chapter_heading = soup.find("h2", string=lambda s: s and "Chapters by State" in s)
+        if chapter_heading is None:
+            return []
 
-        in_chapter_section = False
         current_state = ""
         records: list[OrgRecordCandidate] = []
 
-        for line in lines:
-            if not line:
+        for element in chapter_heading.find_all_next(["h2", "h3", "p"]):
+            text = normalize_name(element.get_text(" ", strip=True))
+            if not text:
                 continue
-            if line == "Chapters by State":
-                in_chapter_section = True
-                continue
-            if not in_chapter_section:
-                continue
-            if line == "Chapter Directory FAQ":
+            if element.name == "h2" and text == "Chapter Directory FAQ":
                 break
-            if line.startswith("###"):
+            if text == "* denotes provisional chapter":
                 continue
-            if line in {"* denotes provisional chapter", "##"}:
+            if element.name == "h3":
+                current_state = normalize_state(text)
                 continue
-
-            if self._looks_like_state_heading(line):
-                current_state = normalize_state(line)
-                continue
-
-            if not current_state:
+            if element.name != "p" or not current_state:
                 continue
 
-            cleaned_name, provisional, professional = self._clean_chapter_name(line)
+            cleaned_name, provisional, professional = self._clean_chapter_name(text)
             if not cleaned_name:
                 continue
             if professional:
@@ -156,15 +148,6 @@ class SacnasChapterDirectoryConnector:
             )
 
         return records
-
-    def _looks_like_state_heading(self, value: str) -> bool:
-        if value in {"Virtual", "District of Columbia", "Puerto Rico", "Guam", "Hawai’i"}:
-            return True
-        return (
-            value.istitle()
-            and len(value.split()) <= 3
-            and not any(token in value for token in ("University", "College", "Chapter", "("))
-        )
 
     def _clean_chapter_name(self, value: str) -> tuple[str, bool, bool]:
         provisional = value.endswith("*")

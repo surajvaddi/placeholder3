@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -6,6 +8,7 @@ from fastapi.responses import FileResponse
 
 from .models import RunCreateRequest
 from .pipeline import TwoShotPipeline
+from .services.seeds import SeedService
 from .storage import Storage
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,6 +27,7 @@ app.add_middleware(
 )
 
 storage = Storage(DB_PATH)
+seed_service = SeedService(PARENT_SEED_PATH, EXPANSION_SEED_PATH)
 pipeline = TwoShotPipeline(
     storage=storage,
     parent_seed_file=PARENT_SEED_PATH,
@@ -39,6 +43,11 @@ def health() -> dict:
 @app.get("/runs")
 def list_runs() -> list[dict]:
     return [run.model_dump() for run in storage.list_runs()]
+
+
+@app.get("/seeds")
+def list_seeds() -> dict:
+    return seed_service.load_bundle().model_dump()
 
 
 @app.post("/runs")

@@ -92,6 +92,7 @@ expansion_seeds:
 
   - seed_id: expand_sacnas_chapter_directory
     connector: sacnas_chapter_directory
+    source_url: https://www.sacnas.org/chapters/chapter-directory
     applies_to:
       seed_ids:
         - parent_sacnas

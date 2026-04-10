@@ -24,6 +24,7 @@ class ParentSeed(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     category: str = Field(min_length=2, max_length=100)
     seed_type: str = Field(min_length=2, max_length=100)
+    source_url: str = ""
     aliases: List[str] = Field(default_factory=list)
     enabled: bool = True
     priority: int = 10
@@ -32,7 +33,7 @@ class ParentSeed(BaseModel):
     notes: str = ""
     updated_at: Union[str, date] = ""
 
-    @field_validator("seed_id", "category", "seed_type")
+    @field_validator("seed_id", "category", "seed_type", "source_url")
     @classmethod
     def normalize_slug_fields(cls, value: str) -> str:
         return value.strip()
@@ -102,6 +103,7 @@ class ExpansionSeed(BaseModel):
     seed_id: str = Field(min_length=3, max_length=100)
     connector: str = Field(min_length=2, max_length=100)
     applies_to: AppliesTo
+    source_url: str = ""
     enabled: bool = True
     priority: int = 10
     discovery_mode: str = Field(min_length=2, max_length=100)
@@ -111,7 +113,7 @@ class ExpansionSeed(BaseModel):
     notes: str = ""
     updated_at: Union[str, date] = ""
 
-    @field_validator("seed_id", "connector", "discovery_mode")
+    @field_validator("seed_id", "connector", "discovery_mode", "source_url")
     @classmethod
     def normalize_slug_fields(cls, value: str) -> str:
         return value.strip()

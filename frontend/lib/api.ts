@@ -51,6 +51,49 @@ export type RunDiagnostics = {
   }>;
 };
 
+export type ParentSeed = {
+  seed_id: string;
+  name: string;
+  category: string;
+  seed_type: string;
+  source_url: string;
+  aliases: string[];
+  enabled: boolean;
+  priority: number;
+  source_hints: string[];
+  tags: string[];
+  notes: string;
+  updated_at: string;
+};
+
+export type ExpansionSeed = {
+  seed_id: string;
+  connector: string;
+  source_url: string;
+  applies_to: {
+    categories: string[];
+    seed_types: string[];
+    seed_ids: string[];
+    tags: string[];
+  };
+  enabled: boolean;
+  priority: number;
+  discovery_mode: string;
+  host_patterns: string[];
+  source_hints: string[];
+  limits: {
+    max_requests_per_parent: number;
+    max_results_per_parent: number;
+  };
+  notes: string;
+  updated_at: string;
+};
+
+export type SeedBundle = {
+  parent_seeds: ParentSeed[];
+  expansion_seeds: ExpansionSeed[];
+};
+
 const API_BASE = "http://localhost:8000";
 
 export async function listRuns(): Promise<Run[]> {
@@ -82,6 +125,14 @@ export async function getRunDiagnostics(runId: number): Promise<RunDiagnostics> 
   const res = await fetch(`${API_BASE}/runs/${runId}/diagnostics`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error("Unable to load run diagnostics.");
+  }
+  return res.json();
+}
+
+export async function getSeeds(): Promise<SeedBundle> {
+  const res = await fetch(`${API_BASE}/seeds`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Unable to load seeds.");
   }
   return res.json();
 }

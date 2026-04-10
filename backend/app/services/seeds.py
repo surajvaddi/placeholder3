@@ -34,6 +34,7 @@ def _parent_seed_fingerprint(seed: ParentSeed) -> str:
         "name": seed.name,
         "category": seed.category,
         "seed_type": seed.seed_type,
+        "source_url": seed.source_url,
         "aliases": seed.aliases,
         "enabled": seed.enabled,
         "priority": seed.priority,
@@ -47,6 +48,7 @@ def _expansion_seed_fingerprint(seed: ExpansionSeed) -> str:
     payload = {
         "seed_id": seed.seed_id,
         "connector": seed.connector,
+        "source_url": seed.source_url,
         "applies_to": seed.applies_to.model_dump(),
         "enabled": seed.enabled,
         "priority": seed.priority,

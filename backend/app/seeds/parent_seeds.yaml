@@ -51,6 +51,7 @@ parent_seeds:
     name: SACNAS
     category: intercollegiate_organizations
     seed_type: national_org
+    source_url: https://www.sacnas.org/chapters/chapter-directory
     aliases:
       - Society for Advancement of Chicanos/Hispanics and Native Americans in Science
     enabled: true
