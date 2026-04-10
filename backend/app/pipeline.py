@@ -345,7 +345,11 @@ class TwoShotPipeline:
             candidates = await connector.discover_parent_entities(
                 seed=unit.seed,
                 fetcher=fetcher,
-                context=ConnectorContext(run_id=run_id),
+                context=ConnectorContext(
+                    run_id=run_id,
+                    seed_name=unit.seed.name,
+                    seed_aliases=tuple(unit.seed.aliases),
+                ),
             )
         if not candidates:
             return self._build_parent_entity(unit.seed)
@@ -362,7 +366,11 @@ class TwoShotPipeline:
                 parent=unit.parent_entity,
                 expansion_seed=unit.expansion_seed,
                 fetcher=fetcher,
-                context=ConnectorContext(run_id=run_id),
+                context=ConnectorContext(
+                    run_id=run_id,
+                    seed_name=unit.parent_seed.name,
+                    seed_aliases=tuple(unit.parent_seed.aliases),
+                ),
             )
         accepted: List[OrgRecord] = []
         rejected_count = 0

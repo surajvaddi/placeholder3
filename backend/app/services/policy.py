@@ -75,7 +75,15 @@ def default_policy_registry() -> PolicyRegistry:
             ),
             SourcePolicy(
                 tag="generic_official",
-                host_patterns=("*.org", "*.com", "*.edu"),
+                host_patterns=(
+                    "*.org",
+                    "*.com",
+                    "*.edu",
+                    "*.campusgroups.com",
+                    "*.campuslabs.com",
+                    "*.collegiatelink.net",
+                    "*.presence.io",
+                ),
                 allowed_connector_names=(
                     "official_seed_page",
                     "campus_directory",

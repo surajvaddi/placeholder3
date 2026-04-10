@@ -11,6 +11,7 @@ from .base import ConnectorContext
 from ..models import ParentEntity
 from ..models_seeds import ExpansionSeed, ParentSeed
 from ..models_sources import Evidence, OrgRecordCandidate, ParentEntityCandidate
+from ..services.campus_sources import discover_campus_directory_pages
 from ..services.normalizer import normalize_name, normalize_state
 
 SACNAS_DIRECTORY_URL = "https://www.sacnas.org/chapters/chapter-directory"
@@ -75,6 +76,23 @@ NOISE_TOKENS = {
     "student",
     "students",
     "visit section website",
+}
+GENERIC_ORG_WORDS = {
+    "alliance",
+    "association",
+    "chapter",
+    "chapters",
+    "club",
+    "clubs",
+    "council",
+    "organization",
+    "organizations",
+    "society",
+    "student",
+    "students",
+    "team",
+    "teams",
+    "union",
 }
 
 
@@ -189,6 +207,64 @@ def _expansion_keywords(parent: ParentEntity, expansion_seed: ExpansionSeed) -> 
     if parent.seed_type == "conference":
         keywords.extend(["all schools", "official school websites"])
     return _base_keywords(keywords)
+
+
+def _seed_identity_terms(context: ConnectorContext, parent: ParentEntity) -> List[str]:
+    raw_values = [parent.name, context.seed_name, *context.seed_aliases]
+    return _base_keywords([value for value in raw_values if value])
+
+
+def _variant_terms(context: ConnectorContext, parent: ParentEntity) -> List[str]:
+    variants: List[str] = []
+    for value in _seed_identity_terms(context, parent):
+        variants.append(value)
+        normalized = value.lower()
+        replacements = (
+            (" union", " association"),
+            (" union", " alliance"),
+            (" union", " organization"),
+            (" association", " union"),
+            (" association", " alliance"),
+            (" association", " organization"),
+            (" alliance", " union"),
+            (" alliance", " association"),
+            (" alliance", " organization"),
+            (" organization", " union"),
+            (" organization", " association"),
+            (" organization", " alliance"),
+            (" chapter", " club"),
+            (" chapter", " team"),
+            (" club", " chapter"),
+            (" team", " chapter"),
+        )
+        for old, new in replacements:
+            if old in normalized:
+                variants.append(normalized.replace(old, new))
+    return _base_keywords(variants)
+
+
+def _identity_tokens(context: ConnectorContext, parent: ParentEntity) -> Set[str]:
+    tokens: Set[str] = set()
+    for value in _variant_terms(context, parent):
+        for token in re.findall(r"[a-z0-9]+", value.lower()):
+            if len(token) < 3:
+                continue
+            if token in GENERIC_ORG_WORDS:
+                continue
+            tokens.add(token)
+    return tokens
+
+
+def _has_identity_overlap(text: str, context: ConnectorContext, parent: ParentEntity) -> bool:
+    lower = text.lower()
+    if any(term in lower for term in _variant_terms(context, parent)):
+        return True
+    candidate_tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]+", lower)
+        if len(token) >= 3 and token not in GENERIC_ORG_WORDS
+    }
+    return bool(candidate_tokens.intersection(_identity_tokens(context, parent)))
 
 
 async def _discover_pages(fetcher, url: str, policy_tag: str, keywords: Sequence[str]) -> List[Tuple[str, BeautifulSoup]]:
@@ -343,12 +419,12 @@ def _short_parent_label(parent_name: str) -> str:
     return acronym or parent_name
 
 
-def _extract_chapter_name(parent: ParentEntity, candidate: str) -> str:
+def _extract_chapter_name(parent: ParentEntity, candidate: str, context: ConnectorContext) -> str:
     text = _clean_candidate_text(candidate)
     lower = text.lower()
     if _is_noise(text):
         return ""
-    if parent.name.lower() in lower or any(
+    if _has_identity_overlap(text, context, parent) and any(
         token in lower
         for token in (
             "alliance",
@@ -374,12 +450,16 @@ def _extract_chapter_name(parent: ParentEntity, candidate: str) -> str:
     return ""
 
 
-def _extract_chapter_names(parent: ParentEntity, pages: Sequence[Tuple[str, BeautifulSoup]]) -> List[Tuple[str, str]]:
+def _extract_chapter_names(
+    parent: ParentEntity,
+    pages: Sequence[Tuple[str, BeautifulSoup]],
+    context: ConnectorContext,
+) -> List[Tuple[str, str]]:
     results: List[Tuple[str, str]] = []
     for page_url, soup in pages:
         for block in _text_blocks(soup):
             for candidate in _split_candidate_names(block):
-                chapter_name = _extract_chapter_name(parent, candidate)
+                chapter_name = _extract_chapter_name(parent, candidate, context)
                 if chapter_name:
                     results.append((chapter_name, page_url))
     return _dedupe_pairs(results)[:MAX_RECORDS_PER_PAGE_SET]
@@ -618,15 +698,27 @@ class GenericDirectoryExpansionConnector:
         if not start_url:
             return []
 
-        pages = await _discover_pages(
-            fetcher=fetcher,
-            url=start_url,
-            policy_tag=GENERIC_POLICY_TAG,
-            keywords=_expansion_keywords(parent, expansion_seed),
+        discovery_keywords = _base_keywords(
+            _expansion_keywords(parent, expansion_seed) + _variant_terms(context, parent)
         )
+        if self.connector_name == "campus_directory":
+            pages = await discover_campus_directory_pages(
+                fetcher=fetcher,
+                start_url=start_url,
+                policy_tag=GENERIC_POLICY_TAG,
+                keywords=discovery_keywords,
+                max_pages=MAX_DISCOVERY_PAGES,
+            )
+        else:
+            pages = await _discover_pages(
+                fetcher=fetcher,
+                url=start_url,
+                policy_tag=GENERIC_POLICY_TAG,
+                keywords=discovery_keywords,
+            )
         if parent.seed_type == "conference" or self.connector_name == "parent_membership_page":
             return self._school_records(parent, expansion_seed, pages)
-        return self._chapter_records(parent, expansion_seed, pages)
+        return self._chapter_records(parent, expansion_seed, pages, context)
 
     def _school_records(
         self,
@@ -663,9 +755,10 @@ class GenericDirectoryExpansionConnector:
         parent: ParentEntity,
         expansion_seed: ExpansionSeed,
         pages: Sequence[Tuple[str, BeautifulSoup]],
+        context: ConnectorContext,
     ) -> List[OrgRecordCandidate]:
         records: List[OrgRecordCandidate] = []
-        for chapter_name, source_url in _extract_chapter_names(parent, pages):
+        for chapter_name, source_url in _extract_chapter_names(parent, pages, context):
             records.append(
                 OrgRecordCandidate(
                     parent_key=parent.parent_key,

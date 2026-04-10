@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Protocol
+from typing import List, Protocol, Tuple
 
 from ..models import ParentEntity
 from ..models_seeds import ExpansionSeed, ParentSeed
@@ -11,6 +11,8 @@ from ..models_sources import OrgRecordCandidate, ParentEntityCandidate
 @dataclass
 class ConnectorContext:
     run_id: int
+    seed_name: str = ""
+    seed_aliases: Tuple[str, ...] = ()
 
 
 class BaseConnector(Protocol):
