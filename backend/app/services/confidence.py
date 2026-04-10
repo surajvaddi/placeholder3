@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from typing import List, Tuple
+
 from ..models_sources import OrgRecordCandidate, ParentEntityCandidate, ReviewFlag
 
 
-def score_parent_candidate(candidate: ParentEntityCandidate) -> tuple[float, list[str]]:
+def score_parent_candidate(candidate: ParentEntityCandidate) -> Tuple[float, List[str]]:
     score = 0.0
-    reasons: list[str] = []
+    reasons: List[str] = []
 
     if candidate.source_url:
         score += 2
@@ -20,9 +22,9 @@ def score_parent_candidate(candidate: ParentEntityCandidate) -> tuple[float, lis
     return score, reasons
 
 
-def score_org_candidate(candidate: OrgRecordCandidate) -> tuple[float, list[str]]:
+def score_org_candidate(candidate: OrgRecordCandidate) -> Tuple[float, List[str]]:
     score = 0.0
-    reasons: list[str] = []
+    reasons: List[str] = []
 
     if candidate.email:
         score += 3

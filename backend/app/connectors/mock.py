@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import List
 
 from .base import ConnectorContext
 from ..models import ParentEntity
@@ -27,7 +28,7 @@ class MockParentDirectoryConnector:
         seed: ParentSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[ParentEntityCandidate]:
+    ) -> List[ParentEntityCandidate]:
         return [
             ParentEntityCandidate(
                 name=seed.name,
@@ -54,7 +55,7 @@ class MockParentDirectoryConnector:
         expansion_seed: ExpansionSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[OrgRecordCandidate]:
+    ) -> List[OrgRecordCandidate]:
         raise NotImplementedError
 
 
@@ -73,7 +74,7 @@ class MockExpansionConnector:
         seed: ParentSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[ParentEntityCandidate]:
+    ) -> List[ParentEntityCandidate]:
         raise NotImplementedError
 
     async def discover_org_records(
@@ -82,8 +83,8 @@ class MockExpansionConnector:
         expansion_seed: ExpansionSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[OrgRecordCandidate]:
-        records: list[OrgRecordCandidate] = []
+    ) -> List[OrgRecordCandidate]:
+        records: List[OrgRecordCandidate] = []
         demo_schools = [("Austin", "TX"), ("Los Angeles", "CA"), ("Madison", "WI")]
         slug = parent.name.lower().replace(" ", "")
         for city, state in demo_schools:

@@ -4,6 +4,7 @@ parent_seeds:
     name: National Society of Black Engineers
     category: intercollegiate_organizations
     seed_type: national_org
+    source_url: https://nsbe.org/
     aliases:
       - NSBE
     enabled: true
@@ -20,6 +21,7 @@ parent_seeds:
     name: Society of Women Engineers
     category: intercollegiate_organizations
     seed_type: national_org
+    source_url: https://swe.org/membership/sections/
     aliases:
       - SWE
     enabled: true
@@ -36,6 +38,7 @@ parent_seeds:
     name: Phi Beta Lambda
     category: intercollegiate_organizations
     seed_type: national_org
+    source_url: https://www.fbla.org/collegiate/membership/
     aliases:
       - PBL
     enabled: true
@@ -68,6 +71,7 @@ parent_seeds:
     name: Big Ten Conference
     category: conferences
     seed_type: conference
+    source_url: https://bigten.org/
     aliases:
       - B1G
     enabled: true
@@ -83,6 +87,7 @@ parent_seeds:
     name: Atlantic Coast Conference
     category: conferences
     seed_type: conference
+    source_url: https://theacc.com/
     aliases:
       - ACC
     enabled: true
@@ -98,6 +103,7 @@ parent_seeds:
     name: Southeastern Conference
     category: conferences
     seed_type: conference
+    source_url: https://www.secsports.com/startup
     aliases:
       - SEC
     enabled: true
@@ -129,6 +135,7 @@ parent_seeds:
     name: National Model United Nations
     category: model_united_nations
     seed_type: competition
+    source_url: https://www.nmun.org/index.html
     aliases:
       - NMUN
     enabled: true
@@ -141,10 +148,72 @@ parent_seeds:
     notes: collegiate MUN conference network
     updated_at: 2026-04-09
 
+  - seed_id: parent_university_model_un
+    name: University Model United Nations
+    category: model_united_nations
+    seed_type: network
+    aliases:
+      - Model United Nations
+      - Model UN
+      - MUN
+      - Model United Nations Association
+      - Model United Nations Organization
+      - Model United Nations Society
+    enabled: true
+    priority: 7
+    source_hints:
+      - official_directory
+    tags:
+      - diplomacy
+      - campus_org
+    notes: broad campus MUN pattern seed for club and team discovery
+    updated_at: 2026-04-09
+
+  - seed_id: parent_science_olympiad
+    name: Science Olympiad
+    category: competitions
+    seed_type: national_org
+    source_url: https://www.soinc.org/
+    aliases:
+      - SciOly
+      - Science Olympiad Club
+      - Science Olympiad Team
+      - Science Olympiad Association
+    enabled: true
+    priority: 8
+    source_hints:
+      - official_directory
+    tags:
+      - stem
+      - competition
+    notes: science olympiad national source and campus club pattern
+    updated_at: 2026-04-09
+
+  - seed_id: parent_collegiate_deca
+    name: Collegiate DECA
+    category: intercollegiate_organizations
+    seed_type: national_org
+    source_url: https://www.deca.org/collegiate
+    aliases:
+      - DECA
+      - DECA Club
+      - DECA Chapter
+      - DECA Association
+    enabled: true
+    priority: 9
+    source_hints:
+      - official_directory
+    tags:
+      - business
+      - chapters
+    notes: collegiate DECA official chapter locator source
+    updated_at: 2026-04-09
+
   - seed_id: parent_american_debate_association
     name: American Debate Association Circuit
     category: debate_organizations
     seed_type: competition
+    source_url: https://americandebateassociation.org/
     aliases:
       - ADA
     enabled: true
@@ -190,6 +259,7 @@ parent_seeds:
     name: National Collegiate Rugby
     category: club_sports
     seed_type: national_org
+    source_url: https://www.ncr.rugby/
     aliases: []
     enabled: true
     priority: 8
@@ -205,6 +275,7 @@ parent_seeds:
     name: USA Ultimate College
     category: club_sports
     seed_type: national_org
+    source_url: https://usaultimate.org/college/
     aliases:
       - USA Ultimate
     enabled: true
@@ -221,6 +292,7 @@ parent_seeds:
     name: Harvard National Model United Nations
     category: model_united_nations
     seed_type: competition
+    source_url: https://www.hnmun.org/
     aliases:
       - HNMUN
     enabled: true
@@ -237,6 +309,7 @@ parent_seeds:
     name: National Parliamentary Debate Association
     category: debate_organizations
     seed_type: national_org
+    source_url: https://npdadebate.com/
     aliases:
       - NPDA
     enabled: true
@@ -252,6 +325,7 @@ parent_seeds:
     name: Cross Examination Debate Association
     category: debate_organizations
     seed_type: national_org
+    source_url: https://cedadebate.org/
     aliases:
       - CEDA
     enabled: true
@@ -267,6 +341,7 @@ parent_seeds:
     name: Alpha Phi Alpha Fraternity, Inc.
     category: fraternity_sorority
     seed_type: fraternity_sorority
+    source_url: https://apa1906.net/chapter-locator/
     aliases:
       - Alpha Phi Alpha
       - ΑΦΑ
@@ -284,6 +359,7 @@ parent_seeds:
     name: Delta Sigma Theta Sorority, Inc.
     category: fraternity_sorority
     seed_type: fraternity_sorority
+    source_url: https://www.deltasigmatheta.org/membership-policies/
     aliases:
       - Delta Sigma Theta
       - ΔΣΘ
@@ -301,6 +377,7 @@ parent_seeds:
     name: Sigma Chi Fraternity
     category: fraternity_sorority
     seed_type: fraternity_sorority
+    source_url: https://sigmachi.org/history/our-history/chapters/
     aliases:
       - Sigma Chi
     enabled: true
@@ -317,6 +394,7 @@ parent_seeds:
     name: Kappa Alpha Theta
     category: fraternity_sorority
     seed_type: fraternity_sorority
+    source_url: https://www.kappaalphatheta.org/find-a-chapter
     aliases:
       - Theta
     enabled: true
@@ -333,6 +411,7 @@ parent_seeds:
     name: Phi Mu Fraternity
     category: fraternity_sorority
     seed_type: fraternity_sorority
+    source_url: https://phimu.org/collegians/extension-new-chapters/
     aliases:
       - Phi Mu
     enabled: true
@@ -349,7 +428,11 @@ parent_seeds:
     name: University Honor Council Network
     category: honor_councils_committees
     seed_type: network
-    aliases: []
+    aliases:
+      - Honor Council
+      - Honor Court
+      - Student Conduct Council
+      - Student Judiciary Association
     enabled: true
     priority: 6
     source_hints:
@@ -363,7 +446,11 @@ parent_seeds:
     name: Judicial Affairs Student Boards
     category: honor_councils_committees
     seed_type: network
-    aliases: []
+    aliases:
+      - Judicial Board
+      - Student Conduct Board
+      - Student Judiciary
+      - Honor Board
     enabled: true
     priority: 6
     source_hints:
@@ -379,6 +466,9 @@ parent_seeds:
     seed_type: network
     aliases:
       - SASA
+      - South Asian Student Association
+      - South Asian Student Organization
+      - South Asian Student Union
     enabled: true
     priority: 7
     source_hints:
@@ -394,6 +484,9 @@ parent_seeds:
     seed_type: network
     aliases:
       - BSU
+      - Black Student Alliance
+      - Black Student Association
+      - Black Student Organization
     enabled: true
     priority: 7
     source_hints:
@@ -409,6 +502,9 @@ parent_seeds:
     seed_type: network
     aliases:
       - LSU
+      - Latinx Student Association
+      - Latin American Student Organization
+      - Hispanic Student Association
     enabled: true
     priority: 7
     source_hints:

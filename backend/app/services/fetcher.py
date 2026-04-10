@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from typing import Dict, Optional, Union
 
 import httpx
 
@@ -15,7 +16,7 @@ class FetchResult:
     status_code: int
     content_type: str
     text: str = ""
-    json_data: dict | list | None = None
+    json_data: Optional[Union[Dict, list]] = None
 
 
 class Fetcher:
@@ -23,16 +24,16 @@ class Fetcher:
         self,
         policy_registry: PolicyRegistry,
         connector_name: str,
-        timeout: httpx.Timeout | None = None,
+        timeout: Optional[httpx.Timeout] = None,
         retries: int = 2,
     ):
         self.policy_registry = policy_registry
         self.connector_name = connector_name
         self.timeout = timeout or httpx.Timeout(connect=10.0, read=20.0, write=20.0, pool=20.0)
         self.retries = retries
-        self._client: httpx.AsyncClient | None = None
-        self._last_request_at: dict[str, float] = {}
-        self._request_counts: dict[str, int] = {}
+        self._client: Optional[httpx.AsyncClient] = None
+        self._last_request_at: Dict[str, float] = {}
+        self._request_counts: Dict[str, int] = {}
 
     async def __aenter__(self) -> "Fetcher":
         self._client = httpx.AsyncClient(
@@ -84,7 +85,7 @@ class Fetcher:
             raise RuntimeError(f"Request budget exceeded for host={host}.")
         await self._respect_rate_limit(host, policy.min_delay_seconds)
 
-        last_error: Exception | None = None
+        last_error: Optional[Exception] = None
         for attempt in range(self.retries + 1):
             try:
                 response = await self._client.request(method, url)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -46,7 +46,7 @@ class ParentSeed(BaseModel):
     @field_validator("aliases", "source_hints", "tags")
     @classmethod
     def normalize_lists(cls, values: List[str]) -> List[str]:
-        seen: set[str] = set()
+        seen: Set[str] = set()
         cleaned: List[str] = []
         for value in values:
             normalized = " ".join(value.split())
@@ -74,7 +74,7 @@ class AppliesTo(BaseModel):
     @field_validator("categories", "seed_types", "seed_ids", "tags")
     @classmethod
     def normalize_lists(cls, values: List[str]) -> List[str]:
-        seen: set[str] = set()
+        seen: Set[str] = set()
         cleaned: List[str] = []
         for value in values:
             normalized = value.strip()
@@ -121,7 +121,7 @@ class ExpansionSeed(BaseModel):
     @field_validator("host_patterns", "source_hints")
     @classmethod
     def normalize_lists(cls, values: List[str]) -> List[str]:
-        seen: set[str] = set()
+        seen: Set[str] = set()
         cleaned: List[str] = []
         for value in values:
             normalized = value.strip()

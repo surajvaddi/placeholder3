@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict, List, Set, Tuple
 
 from .connectors import build_connector_registry
 from .connectors.base import ConnectorContext
@@ -27,7 +28,7 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _stable_hash(payload: dict) -> str:
+def _stable_hash(payload: Dict) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
@@ -60,7 +61,7 @@ class TwoShotPipeline:
         self.connectors = build_connector_registry()
         self.policy_registry = default_policy_registry()
 
-    def run(self, run_id: int, mode: RunMode, seed_ids: list[str] | None = None) -> dict:
+    def run(self, run_id: int, mode: RunMode, seed_ids=None) -> Dict:
         requested_seed_ids = {seed_id.lower() for seed_id in (seed_ids or [])}
         self.storage.update_run_status(run_id, status="running")
 
@@ -125,8 +126,8 @@ class TwoShotPipeline:
             ),
         }
 
-    def _build_shot_one_units(self, parent_seeds: list[ParentSeed]) -> list[ShotOneUnit]:
-        units: list[ShotOneUnit] = []
+    def _build_shot_one_units(self, parent_seeds: List[ParentSeed]) -> List[ShotOneUnit]:
+        units: List[ShotOneUnit] = []
         for seed in parent_seeds:
             units.append(
                 ShotOneUnit(
@@ -138,10 +139,10 @@ class TwoShotPipeline:
         return units
 
     def _process_shot_one_units(
-        self, run_id: int, units: list[ShotOneUnit]
-    ) -> list[ParentEntity]:
+        self, run_id: int, units: List[ShotOneUnit]
+    ) -> List[ParentEntity]:
         started_at = _utc_now()
-        entities: list[ParentEntity] = []
+        entities: List[ParentEntity] = []
         for unit in units:
             entity = asyncio.run(self._run_shot_one_connector(run_id, unit))
             entities.append(entity)
@@ -165,17 +166,17 @@ class TwoShotPipeline:
         self,
         mode: RunMode,
         bundle,
-        changed_parent_seeds: list[ParentSeed],
-        changed_expansion_seeds: list[ExpansionSeed],
-        requested_seed_ids: set[str],
-    ) -> list[ShotTwoUnit]:
+        changed_parent_seeds: List[ParentSeed],
+        changed_expansion_seeds: List[ExpansionSeed],
+        requested_seed_ids: Set[str],
+    ) -> List[ShotTwoUnit]:
         enabled_parent_seeds = [seed for seed in bundle.parent_seeds if seed.enabled]
         enabled_expansion_seeds = [seed for seed in bundle.expansion_seeds if seed.enabled]
         changed_parent_ids = {seed.seed_id for seed in changed_parent_seeds}
         changed_expansion_ids = {seed.seed_id for seed in changed_expansion_seeds}
         prior_completed = self.storage.get_successful_processing_fingerprints("shot2")
 
-        units: list[ShotTwoUnit] = []
+        units: List[ShotTwoUnit] = []
         for parent_seed in enabled_parent_seeds:
             parent_entity = self._build_parent_entity(parent_seed)
             parent_fingerprint = self.seed_service.fingerprint_parent_seed(parent_seed)
@@ -230,10 +231,10 @@ class TwoShotPipeline:
         return units
 
     def _process_shot_two_units(
-        self, run_id: int, units: list[ShotTwoUnit]
-    ) -> list[OrgRecord]:
+        self, run_id: int, units: List[ShotTwoUnit]
+    ) -> List[OrgRecord]:
         started_at = _utc_now()
-        discovered: list[OrgRecord] = []
+        discovered: List[OrgRecord] = []
         for unit in units:
             records, rejected_count = asyncio.run(self._run_shot_two_connector(run_id, unit))
             discovered.extend(records)
@@ -265,6 +266,7 @@ class TwoShotPipeline:
             category=seed.category,
             seed_type=seed.seed_type,
             source_seed_id=seed.seed_id,
+            source_url=seed.source_url or None,
             notes=f"seeded parent entity; seed_id={seed.seed_id}; seed_type={seed.seed_type}",
         )
 
@@ -296,8 +298,8 @@ class TwoShotPipeline:
     def _mark_parent_seeds_processed(
         self,
         run_id: int,
-        registry_entries: list[SeedRegistryEntry],
-        seeds: list[ParentSeed],
+        registry_entries: List[SeedRegistryEntry],
+        seeds: List[ParentSeed],
     ) -> None:
         processed_at = _utc_now()
         selected_seed_ids = {seed.seed_id for seed in seeds}
@@ -317,8 +319,8 @@ class TwoShotPipeline:
     def _mark_expansion_seeds_processed(
         self,
         run_id: int,
-        registry_entries: list[SeedRegistryEntry],
-        seed_ids: set[str],
+        registry_entries: List[SeedRegistryEntry],
+        seed_ids: Set[str],
     ) -> None:
         processed_at = _utc_now()
         for entry in registry_entries:
@@ -351,7 +353,7 @@ class TwoShotPipeline:
 
     async def _run_shot_two_connector(
         self, run_id: int, unit: ShotTwoUnit
-    ) -> tuple[list[OrgRecord], int]:
+    ) -> Tuple[List[OrgRecord], int]:
         connector = self.connectors[unit.expansion_seed.connector]
         async with Fetcher(
             policy_registry=self.policy_registry, connector_name=connector.connector_name
@@ -362,7 +364,7 @@ class TwoShotPipeline:
                 fetcher=fetcher,
                 context=ConnectorContext(run_id=run_id),
             )
-        accepted: list[OrgRecord] = []
+        accepted: List[OrgRecord] = []
         rejected_count = 0
         for candidate in candidates:
             decision = evaluate_org_candidate(candidate)
@@ -396,6 +398,8 @@ class TwoShotPipeline:
     def _shot_one_connector_name(self, seed: ParentSeed) -> str:
         if "sacnas_official_directory" in seed.source_hints:
             return "sacnas_parent_directory"
+        if seed.source_url:
+            return "official_seed_page"
         return "mock_parent_directory"
 
     def _candidate_to_org_record(

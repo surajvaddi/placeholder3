@@ -101,7 +101,7 @@ class DedupeEngine:
         website_idx: Dict[str, OrgRecord],
         insta_idx: Dict[str, OrgRecord],
         signature_idx: Dict[str, OrgRecord],
-    ) -> OrgRecord | None:
+    ) -> Optional[OrgRecord]:
         if incoming.email and incoming.email.lower() in email_idx:
             return email_idx[incoming.email.lower()]
 
@@ -167,8 +167,8 @@ class DedupeEngine:
             status=primary.status,
         )
 
-    def _rank_records(self, a: OrgRecord, b: OrgRecord) -> tuple[OrgRecord, OrgRecord]:
-        def score(record: OrgRecord) -> tuple[float, int, int, int]:
+    def _rank_records(self, a: OrgRecord, b: OrgRecord) -> Tuple[OrgRecord, OrgRecord]:
+        def score(record: OrgRecord) -> Tuple[float, int, int, int]:
             return (
                 record.confidence_score,
                 record.source_count,
@@ -191,7 +191,7 @@ class DedupeEngine:
         return json.dumps(sorted(items))
 
     def _merge_json_object_lists(self, a: str, b: str) -> str:
-        items: dict[str, dict] = {}
+        items: Dict[str, Dict] = {}
         for raw in (a, b):
             try:
                 for value in json.loads(raw or "[]"):

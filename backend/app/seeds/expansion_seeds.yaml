@@ -7,9 +7,11 @@ expansion_seeds:
         - intercollegiate_organizations
         - cultural_clubs_and_organizations
         - honor_councils_committees
+        - model_united_nations
       seed_types:
         - national_org
         - network
+        - competition
     enabled: true
     priority: 10
     discovery_mode: official_directory_only

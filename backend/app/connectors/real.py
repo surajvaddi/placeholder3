@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
+from typing import List, Sequence, Set, Tuple
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -11,10 +14,437 @@ from ..models_sources import Evidence, OrgRecordCandidate, ParentEntityCandidate
 from ..services.normalizer import normalize_name, normalize_state
 
 SACNAS_DIRECTORY_URL = "https://www.sacnas.org/chapters/chapter-directory"
+MAX_DISCOVERY_PAGES = 5
+MAX_RECORDS_PER_PAGE_SET = 150
+GENERIC_POLICY_TAG = "generic_official"
+
+SCHOOL_HINTS = (
+    "academy",
+    "college",
+    "institute",
+    "polytechnic",
+    "school",
+    "state",
+    "tech",
+    "university",
+)
+NON_SCHOOL_ALLOWLIST = {
+    "cal",
+    "clemson",
+    "duke",
+    "louisville",
+    "miami",
+    "northwestern",
+    "notre dame",
+    "pitt",
+    "rutgers",
+    "smu",
+    "stanford",
+    "syracuse",
+    "ucla",
+    "usc",
+}
+NOISE_TOKENS = {
+    "about",
+    "account",
+    "admissions",
+    "all schools",
+    "apply",
+    "athletes",
+    "contact",
+    "donate",
+    "events",
+    "faq",
+    "find chapter",
+    "find chapters",
+    "home",
+    "join",
+    "learn more",
+    "login",
+    "media",
+    "membership",
+    "more",
+    "news",
+    "partners",
+    "privacy policy",
+    "register",
+    "shop",
+    "sign up",
+    "sponsors",
+    "staff",
+    "student",
+    "students",
+    "visit section website",
+}
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _normalize_space(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _same_host(left: str, right: str) -> bool:
+    return urlparse(left).netloc.lower() == urlparse(right).netloc.lower()
+
+
+def _extract_title(soup: BeautifulSoup) -> str:
+    if soup.title and soup.title.string:
+        return _normalize_space(soup.title.string)
+    heading = soup.find(["h1", "h2"])
+    if heading:
+        return _normalize_space(heading.get_text(" ", strip=True))
+    return ""
+
+
+def _base_keywords(values: Sequence[str]) -> List[str]:
+    keywords: List[str] = []
+    seen: Set[str] = set()
+    for value in values:
+        normalized = value.lower().strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        keywords.append(normalized)
+    return keywords
+
+
+def _seed_page_keywords(seed: ParentSeed) -> List[str]:
+    keywords = _base_keywords(
+        [
+            "alliance",
+            "association",
+            "chapter",
+            "chapters",
+            "club",
+            "clubs",
+            "council",
+            "directory",
+            "find",
+            "locator",
+            "member",
+            "members",
+            "membership",
+            "organization",
+            "organizations",
+            "school",
+            "schools",
+            "section",
+            "sections",
+            "society",
+            "affiliate",
+            "affiliates",
+            "collegiate",
+            "union",
+            seed.name,
+            *seed.aliases,
+            *seed.source_hints,
+            *seed.tags,
+        ]
+    )
+    if seed.seed_type == "conference":
+        keywords.extend(["institution", "institutions", "teams", "all schools"])
+    return _base_keywords(keywords)
+
+
+def _expansion_keywords(parent: ParentEntity, expansion_seed: ExpansionSeed) -> List[str]:
+    keywords = _base_keywords(
+        [
+            "alliance",
+            "association",
+            "chapter",
+            "chapters",
+            "club",
+            "clubs",
+            "council",
+            "directory",
+            "find",
+            "locator",
+            "school",
+            "schools",
+            "section",
+            "sections",
+            "affiliate",
+            "affiliates",
+            "member",
+            "members",
+            "institution",
+            "institutions",
+            "organization",
+            "organizations",
+            "society",
+            "team",
+            "teams",
+            "college",
+            "collegiate",
+            "union",
+            parent.name,
+            expansion_seed.connector,
+            expansion_seed.discovery_mode,
+            *expansion_seed.source_hints,
+        ]
+    )
+    if parent.seed_type == "conference":
+        keywords.extend(["all schools", "official school websites"])
+    return _base_keywords(keywords)
+
+
+async def _discover_pages(fetcher, url: str, policy_tag: str, keywords: Sequence[str]) -> List[Tuple[str, BeautifulSoup]]:
+    response = await fetcher.get_text(url, policy_tag=policy_tag)
+    pages: List[Tuple[str, BeautifulSoup]] = []
+    root_url = str(response.url)
+    root_soup = BeautifulSoup(response.text, "lxml")
+    pages.append((root_url, root_soup))
+
+    link_scores: List[Tuple[int, str]] = []
+    seen_links = {root_url}
+    for anchor in root_soup.find_all("a", href=True):
+        href = urljoin(root_url, anchor["href"])
+        if not href.startswith(("http://", "https://")):
+            continue
+        if not _same_host(root_url, href):
+            continue
+        if href in seen_links:
+            continue
+        text = _normalize_space(anchor.get_text(" ", strip=True))
+        haystack = f"{text} {href}".lower()
+        score = sum(1 for keyword in keywords if keyword and keyword in haystack)
+        if score <= 0:
+            continue
+        seen_links.add(href)
+        link_scores.append((score, href))
+
+    for _, candidate_url in sorted(link_scores, key=lambda item: (-item[0], item[1]))[: MAX_DISCOVERY_PAGES - 1]:
+        try:
+            candidate_response = await fetcher.get_text(candidate_url, policy_tag=policy_tag)
+        except Exception:  # noqa: BLE001
+            continue
+        pages.append((str(candidate_response.url), BeautifulSoup(candidate_response.text, "lxml")))
+
+    return pages
+
+
+def _text_blocks(soup: BeautifulSoup) -> List[str]:
+    blocks: List[str] = []
+    for tag in soup.find_all(["a", "li", "option", "p", "td", "h1", "h2", "h3", "h4", "span"]):
+        text = _normalize_space(tag.get_text(" ", strip=True))
+        if text:
+            blocks.append(text)
+    return blocks
+
+
+def _clean_candidate_text(value: str) -> str:
+    text = _normalize_space(value)
+    text = re.sub(r"\s+\|\s+.*$", "", text)
+    text = re.sub(r"\s+-\s+official.*$", "", text, flags=re.IGNORECASE)
+    return text.strip(" -:")
+
+
+def _looks_like_school_name(value: str) -> bool:
+    text = _clean_candidate_text(value)
+    lower = text.lower()
+    if lower in NOISE_TOKENS:
+        return False
+    if len(text) < 3 or len(text) > 90:
+        return False
+    if ":" in text or "," in text:
+        return False
+    if sum(ch.isalpha() for ch in text) < 3:
+        return False
+    if any(token in lower for token in SCHOOL_HINTS):
+        return True
+    return lower in NON_SCHOOL_ALLOWLIST
+
+
+def _is_noise(value: str) -> bool:
+    text = _clean_candidate_text(value).lower()
+    if not text:
+        return True
+    if text in NOISE_TOKENS:
+        return True
+    if text.startswith(("find ", "view ", "learn ", "explore ")):
+        return True
+    if len(text) < 3 or len(text) > 120:
+        return True
+    return False
+
+
+def _dedupe_strings(values: Sequence[str]) -> List[str]:
+    seen: Set[str] = set()
+    result: List[str] = []
+    for value in values:
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
+def _dedupe_pairs(values: Sequence[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    seen: Set[str] = set()
+    result: List[Tuple[str, str]] = []
+    for value, source_url in values:
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append((value, source_url))
+    return result
+
+
+def _split_candidate_names(value: str) -> List[str]:
+    raw = re.split(r"\s{2,}|;|•|\||\n", value)
+    values: List[str] = []
+    for item in raw:
+        cleaned = _clean_candidate_text(item)
+        if cleaned:
+            values.append(cleaned)
+    return values
+
+
+def _extract_membership_sentence_names(text: str) -> List[str]:
+    matches = re.findall(
+        r"(?:membership includes|member institutions include|official school websites)(.*?)(?:\.|$)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    values: List[str] = []
+    for match in matches:
+        normalized = match.replace(" and ", ", ")
+        for item in normalized.split(","):
+            cleaned = _clean_candidate_text(item)
+            if _looks_like_school_name(cleaned):
+                values.append(cleaned)
+    return values
+
+
+def _extract_school_names(pages: Sequence[Tuple[str, BeautifulSoup]]) -> List[Tuple[str, str]]:
+    results: List[Tuple[str, str]] = []
+    for page_url, soup in pages:
+        page_text = _normalize_space(soup.get_text(" ", strip=True))
+        for school_name in _extract_membership_sentence_names(page_text):
+            results.append((school_name, page_url))
+
+        for block in _text_blocks(soup):
+            for candidate in _split_candidate_names(block):
+                if _looks_like_school_name(candidate):
+                    results.append((candidate, page_url))
+    return _dedupe_pairs(results)[:MAX_RECORDS_PER_PAGE_SET]
+
+
+def _short_parent_label(parent_name: str) -> str:
+    words = [word for word in re.split(r"\s+", parent_name) if word]
+    if len(words) <= 4:
+        return parent_name
+    acronym = "".join(word[0] for word in words if word[0].isalnum()).upper()
+    return acronym or parent_name
+
+
+def _extract_chapter_name(parent: ParentEntity, candidate: str) -> str:
+    text = _clean_candidate_text(candidate)
+    lower = text.lower()
+    if _is_noise(text):
+        return ""
+    if parent.name.lower() in lower or any(
+        token in lower
+        for token in (
+            "alliance",
+            "association",
+            "chapter",
+            "chapters",
+            "club",
+            "clubs",
+            "council",
+            "organization",
+            "organizations",
+            "section",
+            "sections",
+            "society",
+            "union",
+            "affiliate",
+            "affiliates",
+        )
+    ):
+        return normalize_name(text)
+    if _looks_like_school_name(text):
+        return normalize_name(f"{text} {_short_parent_label(parent.name)} Chapter")
+    return ""
+
+
+def _extract_chapter_names(parent: ParentEntity, pages: Sequence[Tuple[str, BeautifulSoup]]) -> List[Tuple[str, str]]:
+    results: List[Tuple[str, str]] = []
+    for page_url, soup in pages:
+        for block in _text_blocks(soup):
+            for candidate in _split_candidate_names(block):
+                chapter_name = _extract_chapter_name(parent, candidate)
+                if chapter_name:
+                    results.append((chapter_name, page_url))
+    return _dedupe_pairs(results)[:MAX_RECORDS_PER_PAGE_SET]
+
+
+class OfficialSeedPageConnector:
+    connector_name = "official_seed_page"
+
+    def supports_shot_one(self) -> bool:
+        return True
+
+    def supports_shot_two(self) -> bool:
+        return False
+
+    async def discover_parent_entities(
+        self,
+        seed: ParentSeed,
+        fetcher,
+        context: ConnectorContext,
+    ) -> List[ParentEntityCandidate]:
+        if not seed.source_url:
+            return []
+
+        pages = await _discover_pages(
+            fetcher=fetcher,
+            url=seed.source_url,
+            policy_tag=GENERIC_POLICY_TAG,
+            keywords=_seed_page_keywords(seed),
+        )
+        if not pages:
+            return []
+
+        best_url, best_soup = pages[0]
+        best_title = _extract_title(best_soup)
+        evidence_parts = [part for part in [best_title, seed.name] if part]
+        evidence_snippet = " | ".join(evidence_parts)
+
+        return [
+            ParentEntityCandidate(
+                name=seed.name,
+                category=seed.category,
+                seed_type=seed.seed_type,
+                source_seed_id=seed.seed_id,
+                source_url=best_url,
+                notes=f"validated against official source page for seed_id={seed.seed_id}",
+                evidence=[
+                    Evidence(
+                        connector=self.connector_name,
+                        source_url=best_url,
+                        source_type="official_source_page",
+                        observed_at=_utc_now(),
+                        snippet=evidence_snippet,
+                    )
+                ],
+            )
+        ]
+
+    async def discover_org_records(
+        self,
+        parent: ParentEntity,
+        expansion_seed: ExpansionSeed,
+        fetcher,
+        context: ConnectorContext,
+    ) -> List[OrgRecordCandidate]:
+        raise NotImplementedError
 
 
 class SacnasParentDirectoryConnector:
@@ -31,7 +461,7 @@ class SacnasParentDirectoryConnector:
         seed: ParentSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[ParentEntityCandidate]:
+    ) -> List[ParentEntityCandidate]:
         page = await fetcher.get_text(SACNAS_DIRECTORY_URL, policy_tag="sacnas_official")
         if "Chapter Directory" not in page.text or "SACNAS" not in page.text:
             return []
@@ -63,7 +493,7 @@ class SacnasParentDirectoryConnector:
         expansion_seed: ExpansionSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[OrgRecordCandidate]:
+    ) -> List[OrgRecordCandidate]:
         raise NotImplementedError
 
 
@@ -81,7 +511,7 @@ class SacnasChapterDirectoryConnector:
         seed: ParentSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[ParentEntityCandidate]:
+    ) -> List[ParentEntityCandidate]:
         raise NotImplementedError
 
     async def discover_org_records(
@@ -90,7 +520,7 @@ class SacnasChapterDirectoryConnector:
         expansion_seed: ExpansionSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[OrgRecordCandidate]:
+    ) -> List[OrgRecordCandidate]:
         page = await fetcher.get_text(SACNAS_DIRECTORY_URL, policy_tag="sacnas_official")
         soup = BeautifulSoup(page.text, "lxml")
         chapter_heading = soup.find("h2", string=lambda s: s and "Chapters by State" in s)
@@ -98,7 +528,7 @@ class SacnasChapterDirectoryConnector:
             return []
 
         current_state = ""
-        records: list[OrgRecordCandidate] = []
+        records: List[OrgRecordCandidate] = []
 
         for element in chapter_heading.find_all_next(["h2", "h3", "p"]):
             text = normalize_name(element.get_text(" ", strip=True))
@@ -149,7 +579,7 @@ class SacnasChapterDirectoryConnector:
 
         return records
 
-    def _clean_chapter_name(self, value: str) -> tuple[str, bool, bool]:
+    def _clean_chapter_name(self, value: str) -> Tuple[str, bool, bool]:
         provisional = value.endswith("*")
         cleaned = value.rstrip("*").strip()
         professional = "(Professional Chapter)" in cleaned
@@ -157,3 +587,103 @@ class SacnasChapterDirectoryConnector:
         cleaned = cleaned.replace(" - ", " ")
         cleaned = normalize_name(cleaned)
         return cleaned, provisional, professional
+
+
+class GenericDirectoryExpansionConnector:
+    def __init__(self, connector_name: str):
+        self.connector_name = connector_name
+
+    def supports_shot_one(self) -> bool:
+        return False
+
+    def supports_shot_two(self) -> bool:
+        return True
+
+    async def discover_parent_entities(
+        self,
+        seed: ParentSeed,
+        fetcher,
+        context: ConnectorContext,
+    ) -> List[ParentEntityCandidate]:
+        raise NotImplementedError
+
+    async def discover_org_records(
+        self,
+        parent: ParentEntity,
+        expansion_seed: ExpansionSeed,
+        fetcher,
+        context: ConnectorContext,
+    ) -> List[OrgRecordCandidate]:
+        start_url = expansion_seed.source_url or parent.source_url or ""
+        if not start_url:
+            return []
+
+        pages = await _discover_pages(
+            fetcher=fetcher,
+            url=start_url,
+            policy_tag=GENERIC_POLICY_TAG,
+            keywords=_expansion_keywords(parent, expansion_seed),
+        )
+        if parent.seed_type == "conference" or self.connector_name == "parent_membership_page":
+            return self._school_records(parent, expansion_seed, pages)
+        return self._chapter_records(parent, expansion_seed, pages)
+
+    def _school_records(
+        self,
+        parent: ParentEntity,
+        expansion_seed: ExpansionSeed,
+        pages: Sequence[Tuple[str, BeautifulSoup]],
+    ) -> List[OrgRecordCandidate]:
+        records: List[OrgRecordCandidate] = []
+        for school_name, source_url in _extract_school_names(pages):
+            records.append(
+                OrgRecordCandidate(
+                    parent_key=parent.parent_key,
+                    expansion_seed_id=expansion_seed.seed_id,
+                    name=school_name,
+                    business_name=school_name,
+                    category=parent.category,
+                    website=source_url,
+                    notes=f"discovered from official member list for {parent.name}",
+                    evidence=[
+                        Evidence(
+                            connector=self.connector_name,
+                            source_url=source_url,
+                            source_type="official_members_page",
+                            observed_at=_utc_now(),
+                            snippet=school_name,
+                        )
+                    ],
+                )
+            )
+        return records
+
+    def _chapter_records(
+        self,
+        parent: ParentEntity,
+        expansion_seed: ExpansionSeed,
+        pages: Sequence[Tuple[str, BeautifulSoup]],
+    ) -> List[OrgRecordCandidate]:
+        records: List[OrgRecordCandidate] = []
+        for chapter_name, source_url in _extract_chapter_names(parent, pages):
+            records.append(
+                OrgRecordCandidate(
+                    parent_key=parent.parent_key,
+                    expansion_seed_id=expansion_seed.seed_id,
+                    name=chapter_name,
+                    business_name=chapter_name,
+                    category=parent.category,
+                    website=source_url,
+                    notes=f"discovered from official directory for {parent.name}",
+                    evidence=[
+                        Evidence(
+                            connector=self.connector_name,
+                            source_url=source_url,
+                            source_type="official_directory",
+                            observed_at=_utc_now(),
+                            snippet=chapter_name,
+                        )
+                    ],
+                )
+            )
+        return records

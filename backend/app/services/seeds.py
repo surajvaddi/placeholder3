@@ -4,6 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 import yaml
 
@@ -23,7 +24,7 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _fingerprint_payload(payload: dict) -> str:
+def _fingerprint_payload(payload: Dict) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
@@ -78,9 +79,9 @@ class SeedService:
             expansion_seeds=expansion_file.expansion_seeds,
         )
 
-    def build_registry_entries(self, bundle: SeedBundle) -> list[SeedRegistryEntry]:
+    def build_registry_entries(self, bundle: SeedBundle) -> List[SeedRegistryEntry]:
         seen_at = _utc_now()
-        entries: list[SeedRegistryEntry] = []
+        entries: List[SeedRegistryEntry] = []
 
         for seed in bundle.parent_seeds:
             entries.append(
@@ -123,17 +124,20 @@ class SeedService:
     def changed_parent_seeds(
         self,
         bundle: SeedBundle,
-        registry_entries: dict[tuple[str, SeedFamily], SeedRegistryEntry],
+        registry_entries: Dict[Tuple[str, SeedFamily], SeedRegistryEntry],
         mode: str,
-        requested_seed_ids: set[str] | None = None,
-    ) -> list[ParentSeed]:
+        requested_seed_ids: Optional[Set[str]] = None,
+    ) -> List[ParentSeed]:
         requested_seed_ids = requested_seed_ids or set()
-        selected: list[ParentSeed] = []
+        selected: List[ParentSeed] = []
 
         for seed in bundle.parent_seeds:
             if not seed.enabled:
                 continue
             if mode == "seed_targeted" and seed.seed_id.lower() not in requested_seed_ids:
+                continue
+            if mode == "seed_targeted":
+                selected.append(seed)
                 continue
             if mode == "full":
                 selected.append(seed)
@@ -149,17 +153,20 @@ class SeedService:
     def changed_expansion_seeds(
         self,
         bundle: SeedBundle,
-        registry_entries: dict[tuple[str, SeedFamily], SeedRegistryEntry],
+        registry_entries: Dict[Tuple[str, SeedFamily], SeedRegistryEntry],
         mode: str,
-        requested_seed_ids: set[str] | None = None,
-    ) -> list[ExpansionSeed]:
+        requested_seed_ids: Optional[Set[str]] = None,
+    ) -> List[ExpansionSeed]:
         requested_seed_ids = requested_seed_ids or set()
-        selected: list[ExpansionSeed] = []
+        selected: List[ExpansionSeed] = []
 
         for seed in bundle.expansion_seeds:
             if not seed.enabled:
                 continue
             if mode == "seed_targeted" and seed.seed_id.lower() not in requested_seed_ids:
+                continue
+            if mode == "seed_targeted":
+                selected.append(seed)
                 continue
             if mode == "full":
                 selected.append(seed)
@@ -173,9 +180,9 @@ class SeedService:
         return sorted(selected, key=lambda seed: (-seed.priority, seed.seed_id.lower()))
 
     def _ensure_unique_ids(
-        self, parent_seeds: list[ParentSeed], expansion_seeds: list[ExpansionSeed]
+        self, parent_seeds: List[ParentSeed], expansion_seeds: List[ExpansionSeed]
     ) -> None:
-        seen: set[str] = set()
+        seen: Set[str] = set()
         for seed in [*parent_seeds, *expansion_seeds]:
             key = seed.seed_id.lower()
             if key in seen:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,7 +42,7 @@ def health() -> dict:
 
 
 @app.get("/runs")
-def list_runs() -> list[dict]:
+def list_runs() -> List[Dict]:
     return [run.model_dump() for run in storage.list_runs()]
 
 
@@ -65,17 +66,17 @@ def create_run(payload: RunCreateRequest) -> dict:
 
 
 @app.get("/runs/{run_id}/records")
-def run_records(run_id: int) -> list[dict]:
+def run_records(run_id: int) -> List[Dict]:
     return [record.to_csv_row() for record in storage.list_records(run_id)]
 
 
 @app.get("/runs/{run_id}/records/detail")
-def run_record_details(run_id: int) -> list[dict]:
+def run_record_details(run_id: int) -> List[Dict]:
     return storage.list_record_details(run_id)
 
 
 @app.get("/runs/{run_id}/logs")
-def run_logs(run_id: int) -> list[dict]:
+def run_logs(run_id: int) -> List[Dict]:
     return storage.list_run_logs(run_id)
 
 

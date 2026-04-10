@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
 class SourcePolicy:
     tag: str
-    host_patterns: tuple[str, ...]
-    allowed_connector_names: tuple[str, ...]
+    host_patterns: Tuple[str, ...]
+    allowed_connector_names: Tuple[str, ...]
     robots_required: bool = True
     min_delay_seconds: float = 1.0
     max_requests_per_run: int = 25
@@ -19,7 +20,7 @@ class SourcePolicy:
 
 
 class PolicyRegistry:
-    def __init__(self, policies: list[SourcePolicy] | None = None):
+    def __init__(self, policies: Optional[List[SourcePolicy]] = None):
         self._policies = policies or []
 
     def resolve(self, url: str, connector_name: str, policy_tag: str) -> SourcePolicy:
@@ -71,6 +72,24 @@ def default_policy_registry() -> PolicyRegistry:
                 allow_html=True,
                 allow_json=False,
                 notes="Official SACNAS chapter directory access.",
+            ),
+            SourcePolicy(
+                tag="generic_official",
+                host_patterns=("*.org", "*.com", "*.edu"),
+                allowed_connector_names=(
+                    "official_seed_page",
+                    "campus_directory",
+                    "parent_membership_page",
+                    "competition_directory",
+                    "club_sports_directory",
+                    "greek_life_directory",
+                ),
+                robots_required=True,
+                min_delay_seconds=1.5,
+                max_requests_per_run=40,
+                allow_html=True,
+                allow_json=False,
+                notes="Generic official-site policy for seeded public discovery pages.",
             )
         ]
     )

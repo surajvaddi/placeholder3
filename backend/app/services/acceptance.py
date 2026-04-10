@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import List
 
 from ..models_sources import OrgRecordCandidate, ReviewFlag
 
@@ -8,13 +9,13 @@ from ..models_sources import OrgRecordCandidate, ReviewFlag
 @dataclass
 class AcceptanceDecision:
     outcome: str
-    review_flags: list[ReviewFlag]
-    reasons: list[str]
+    review_flags: List[ReviewFlag]
+    reasons: List[str]
 
 
 def evaluate_org_candidate(candidate: OrgRecordCandidate) -> AcceptanceDecision:
     flags = list(candidate.review_flags)
-    reasons: list[str] = []
+    reasons: List[str] = []
 
     has_email = bool(candidate.email)
     has_web_signal = bool(candidate.website or candidate.instagram)

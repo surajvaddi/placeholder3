@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -76,7 +76,7 @@ class RunCreateRequest(BaseModel):
 
     @property
     def normalized_seed_ids(self) -> List[str]:
-        seen: set[str] = set()
+        seen: Set[str] = set()
         values: List[str] = []
         for seed_id in self.seed_ids:
             normalized = seed_id.strip()

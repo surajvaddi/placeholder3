@@ -4,7 +4,7 @@ import csv
 import json
 import sqlite3
 from pathlib import Path
-from typing import Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 from .models import OrgRecord, ParentEntity, RecordStatus, RunMode, RunResponse
 from .models_seeds import SeedFamily, SeedRegistryEntry, SeedRegistryStatus
@@ -175,9 +175,9 @@ class Storage:
         self,
         run_id: int,
         status: str,
-        parent_entity_count: int | None = None,
-        discovered_club_count: int | None = None,
-        deduped_count: int | None = None,
+        parent_entity_count: Optional[int] = None,
+        discovered_club_count: Optional[int] = None,
+        deduped_count: Optional[int] = None,
     ) -> None:
         with self._connect() as conn:
             conn.execute("UPDATE runs SET status=? WHERE run_id=?", (status, run_id))
@@ -442,7 +442,7 @@ class Storage:
             for r in rows
         ]
 
-    def list_record_details(self, run_id: int) -> list[dict]:
+    def list_record_details(self, run_id: int) -> List[Dict]:
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -455,7 +455,7 @@ class Storage:
                 """,
                 (run_id,),
             ).fetchall()
-        details: list[dict] = []
+        details: List[Dict] = []
         for row in rows:
             review_flags = json.loads(row[13] or "[]")
             evidence = json.loads(row[14] or "[]")
@@ -483,7 +483,7 @@ class Storage:
             )
         return details
 
-    def list_run_logs(self, run_id: int) -> list[dict]:
+    def list_run_logs(self, run_id: int) -> List[Dict]:
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -495,7 +495,7 @@ class Storage:
                 """,
                 (run_id,),
             ).fetchall()
-        logs: list[dict] = []
+        logs: List[Dict] = []
         for row in rows:
             logs.append(
                 {
@@ -547,9 +547,9 @@ class Storage:
         status: str,
         input_fingerprint: str,
         started_at: str,
-        completed_at: str | None,
+        completed_at: Optional[str],
         error_message: str = "",
-        context: dict | None = None,
+        context: Optional[Dict] = None,
     ) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -575,7 +575,7 @@ class Storage:
                 ),
             )
 
-    def get_successful_processing_fingerprints(self, shot: str) -> dict[str, str]:
+    def get_successful_processing_fingerprints(self, shot: str) -> Dict[str, str]:
         with self._connect() as conn:
             rows = conn.execute(
                 """

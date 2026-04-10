@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import List, Protocol
 
 from ..models import ParentEntity
 from ..models_seeds import ExpansionSeed, ParentSeed
@@ -24,7 +24,7 @@ class BaseConnector(Protocol):
         seed: ParentSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[ParentEntityCandidate]: ...
+    ) -> List[ParentEntityCandidate]: ...
 
     async def discover_org_records(
         self,
@@ -32,4 +32,4 @@ class BaseConnector(Protocol):
         expansion_seed: ExpansionSeed,
         fetcher,
         context: ConnectorContext,
-    ) -> list[OrgRecordCandidate]: ...
+    ) -> List[OrgRecordCandidate]: ...

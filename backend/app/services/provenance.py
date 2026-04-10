@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import List, Optional
+
 from ..models_sources import Evidence
 
 
-def format_notes_from_evidence(evidence: list[Evidence], extra_notes: list[str] | None = None) -> str:
-    parts: list[str] = []
+def format_notes_from_evidence(
+    evidence: List[Evidence], extra_notes: Optional[List[str]] = None
+) -> str:
+    parts: List[str] = []
     if evidence:
         connectors = ",".join(sorted({item.connector for item in evidence if item.connector}))
         urls = ",".join(item.source_url for item in evidence if item.source_url)
