@@ -168,12 +168,15 @@ class DedupeEngine:
         )
 
     def _rank_records(self, a: OrgRecord, b: OrgRecord) -> Tuple[OrgRecord, OrgRecord]:
-        def score(record: OrgRecord) -> Tuple[float, int, int, int]:
+        def score(record: OrgRecord) -> Tuple[float, int, int, int, int, int]:
             return (
                 record.confidence_score,
-                record.source_count,
                 int(bool(record.email)),
-                int(bool(record.website or record.instagram)),
+                int(bool(record.website)),
+                int(bool(record.instagram)),
+                record.source_count,
+                len(record.website),
+                len(record.email),
             )
 
         if score(a) >= score(b):

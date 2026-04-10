@@ -27,14 +27,17 @@ def score_org_candidate(candidate: OrgRecordCandidate) -> Tuple[float, List[str]
     reasons: List[str] = []
 
     if candidate.email:
-        score += 3
+        score += 5
         reasons.append("has_email")
     if candidate.website:
-        score += 2
+        score += 3
         reasons.append("has_website")
     if candidate.instagram:
         score += 1
         reasons.append("has_instagram")
+    if candidate.email and candidate.website:
+        score += 2
+        reasons.append("email_and_website_outreach_ready")
     if candidate.city and candidate.state:
         score += 1
         reasons.append("has_geo")
